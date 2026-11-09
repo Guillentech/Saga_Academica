@@ -1,5 +1,5 @@
 import React from 'react';
-import { CloudLightning, Swords, ScrollText } from 'lucide-react';
+import { CloudLightning, Flame, Swords, ScrollText } from 'lucide-react';
 import { AvatarHero16Bit, AlchemistWizard16Bit } from '../mapa/Sprites';
 import PixelBar from './PixelBar';
 import RuneAudioPlayer from './RuneAudioPlayer';
@@ -20,6 +20,8 @@ export default function GameHud({
   examenesPendientes = 0,
   tareasPendientes = 0,
   hayTormenta = false,
+  rachaActual = 0,
+  metaDiariaCumplida = false,
   onHablarAlquimista,
 }) {
   const clase = user?.clase_rpg || 'Aventurero';
@@ -113,6 +115,28 @@ export default function GameHud({
                   </span>
                 </div>
               </div>
+            </div>
+
+            <div className="flex min-w-0 items-center justify-between gap-1.5 bg-[#1b1440] px-1.5 py-1 shadow-[inset_0_0_0_1px_#3b2d86]">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <Flame
+                  size={14}
+                  className={rachaActual > 0 ? 'shrink-0 text-[#ff8a3d]' : 'shrink-0 text-[#8a5cf6]'}
+                />
+                <div className="min-w-0">
+                  <span className="ui-px block text-[6px] leading-none text-[#b4aedb]">RACHA DIARIA</span>
+                  <span className="block truncate text-[14px] leading-none text-[#f6efe0]">
+                    {rachaActual} {rachaActual === 1 ? 'día' : 'días'}
+                  </span>
+                </div>
+              </div>
+              <span
+                className={`ui-px shrink-0 text-[6px] leading-none ${
+                  metaDiariaCumplida ? 'text-[#3ddc84]' : 'text-[#8a5cf6]'
+                }`}
+              >
+                {metaDiariaCumplida ? 'META ✓' : 'META 1/DÍA'}
+              </span>
             </div>
           </div>
         </div>

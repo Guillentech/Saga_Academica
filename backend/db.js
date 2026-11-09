@@ -143,6 +143,21 @@ db.exec(`
     FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id) ON DELETE CASCADE,
     FOREIGN KEY (logro_id) REFERENCES logros(id) ON DELETE CASCADE
   );
+
+  -- 🎯 Respuestas del Campo de Entrenamiento (práctica sin nota)
+  CREATE TABLE IF NOT EXISTS practicas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    estudiante_id INTEGER NOT NULL,
+    pregunta_id INTEGER NOT NULL,
+    respuesta TEXT NOT NULL,
+    es_correcta INTEGER NOT NULL DEFAULT 0,
+    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id) ON DELETE CASCADE,
+    FOREIGN KEY (pregunta_id) REFERENCES preguntas(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_practicas_estudiante_fecha
+    ON practicas(estudiante_id, fecha);
 `);
 
 // 2. Migraciones automáticas seguras para agregar columnas RPG sin perder datos existentes
@@ -247,7 +262,12 @@ const LOGROS_SEMILLA = [
   ['racha_7', 'Racha de 7 Días', 'Registra actividad en 7 días consecutivos.', '📅', 200, 11],
   ['xp_2000', 'Leyenda del Gremio', 'Acumula 2000 XP de héroe.', '✨', 150, 12],
   ['coleccionista', 'Coleccionista de Medallas', 'Desbloquea 6 logros del Gremio.', '🏆', 250, 13],
-  ['archimago', 'Archimago de Sistemas', 'Alcanza el nivel 12 de héroe.', '👑', 300, 14]
+  ['archimago', 'Archimago de Sistemas', 'Alcanza el nivel 12 de héroe.', '👑', 300, 14],
+  ['racha_3', 'Brasa Constante', 'Registra actividad en 3 días consecutivos.', '🔥', 100, 15],
+  ['racha_14', 'Fuego Eterno', 'Registra actividad en 14 días consecutivos.', '🔥', 250, 16],
+  ['racha_30', 'Corazón de Dragón', 'Registra actividad en 30 días consecutivos.', '🐉', 400, 17],
+  ['entrenador_10', 'Aprendiz del Campo', 'Completa 10 preguntas en el Campo de Entrenamiento.', '🎯', 80, 18],
+  ['entrenador_50', 'Maestro de Simulacros', 'Completa 50 preguntas en el Campo de Entrenamiento.', '🏹', 200, 19]
 ];
 
 const insertarLogro = db.prepare(`

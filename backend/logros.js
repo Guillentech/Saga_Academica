@@ -1,4 +1,5 @@
 import db from './db.js';
+import { calcularResumenRacha } from './racha.js';
 
 // 🏆 Motor de logros: evalúa las medallas de un héroe a partir de su actividad real.
 // Mantiene las mismas reglas de progreso que el motor de corrección (XP base, nivel y nota).
@@ -9,25 +10,6 @@ const XP_POR_NIVEL = 250;
 const MAX_VUELTAS = 4; // Permite desbloquear logros en cascada (p. ej. nivel → coleccionista)
 
 const nivelDesdeXp = (xp) => Math.max(1, Math.floor((Number(xp) || 0) / XP_POR_NIVEL) + 1);
-
-const diasEntre = (fechaA, fechaB) =>
-  Math.round((Date.parse(`${fechaA}T00:00:00Z`) - Date.parse(`${fechaB}T00:00:00Z`)) / 86400000);
-
-// Racha de días con actividad (evaluaciones + entregas), terminando hoy o ayer.
-const contarRachaDias = (fechas = []) => {
-  const dias = [...new Set(fechas.filter(Boolean).map((f) => String(f).slice(0, 10)))].sort().reverse();
-  if (dias.length === 0) return 0;
-
-  const hoy = new Date().toISOString().slice(0, 10);
-  if (diasEntre(hoy, dias[0]) > 1) return 0;
-
-  let racha = 1;
-  for (let i = 1; i < dias.length; i += 1) {
-    if (diasEntre(dias[i - 1], dias[i]) !== 1) break;
-    racha += 1;
-  }
-  return racha;
-};
 
 // Últimas entregas calificadas aprobadas de forma consecutiva.
 const contarRachaMisiones = (estudianteId) => {
@@ -108,11 +90,20 @@ const crearContexto = (estudianteId) => {
     WHERE estudiante_id = ?
   `).get(estudianteId);
 
+  const practicas = db.prepare(`
+    SELECT COUNT(*) as total,
+           COALESCE(SUM(CASE WHEN es_correcta = 1 THEN 1 ELSE 0 END), 0) as correctas
+    FROM practicas
+    WHERE estudiante_id = ?
+  `).get(estudianteId);
+
   const fechas = db.prepare(`
     SELECT fecha FROM calificaciones WHERE estudiante_id = ?
     UNION ALL
     SELECT fecha FROM entregas WHERE estudiante_id = ?
-  `).all(estudianteId, estudianteId).map((fila) => fila.fecha);
+    UNION ALL
+    SELECT fecha FROM practicas WHERE estudiante_id = ?
+  `).all(estudianteId, estudianteId, estudianteId).map((fila) => fila.fecha);
 
   const desbloqueados = new Set(db.prepare(`
     SELECT l.codigo
@@ -125,8 +116,9 @@ const crearContexto = (estudianteId) => {
     perfil,
     evaluaciones,
     entregas,
+    practicas,
     rachaMisiones: contarRachaMisiones(estudianteId),
-    rachaDias: contarRachaDias(fechas),
+    rachaDias: calcularResumenRacha(fechas).actual,
     desbloqueados
   };
 };
@@ -143,10 +135,15 @@ const REGLAS = {
   nota_alta: { meta: 80, valor: (c) => c.perfil.nota_materia },
   nivel_5: { meta: 5, valor: (c) => c.perfil.nivel },
   nivel_10: { meta: 10, valor: (c) => c.perfil.nivel },
+  racha_3: { meta: 3, valor: (c) => c.rachaDias },
   racha_7: { meta: 7, valor: (c) => c.rachaDias },
+  racha_14: { meta: 14, valor: (c) => c.rachaDias },
+  racha_30: { meta: 30, valor: (c) => c.rachaDias },
   xp_2000: { meta: 2000, valor: (c) => c.perfil.xp },
   coleccionista: { meta: 6, valor: (c) => c.desbloqueados.size },
-  archimago: { meta: 12, valor: (c) => c.perfil.nivel }
+  archimago: { meta: 12, valor: (c) => c.perfil.nivel },
+  entrenador_10: { meta: 10, valor: (c) => c.practicas.total },
+  entrenador_50: { meta: 50, valor: (c) => c.practicas.total }
 };
 
 /**

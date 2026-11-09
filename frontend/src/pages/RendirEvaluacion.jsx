@@ -174,6 +174,14 @@ export default function RendirEvaluacion() {
             </div>
           )}
 
+          <button
+            onClick={() => navigate('/panel-estudiante?vista=entrenamiento')}
+            className="btn-pro btn-pro-ai btn-block"
+            style={{ marginBottom: '0.5rem' }}
+          >
+            <Sparkles size={18} /> {aprobado ? 'Reforzar lo aprendido' : 'Entrenar mis puntos débiles'}
+          </button>
+
           <button onClick={() => navigate('/panel-estudiante')} className="btn-pro btn-pro-primary btn-block">
             <ArrowLeft size={18} /> Volver al Mapa 2D
           </button>

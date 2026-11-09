@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { API_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Send } from 'lucide-react';
 import { StatBar, GameHud, GameHotbar, PageBackdrop, MarkdownLite } from '../components/rpg';
 import PerfilEstudiante from '../components/perfil/PerfilEstudiante';
 import MapaGeneral from '../components/mapa/MapaGeneral';
 import MapaUnidad from '../components/mapa/MapaUnidad';
 import ModalTema from '../components/mapa/ModalTema';
+import CampoEntrenamiento from '../components/entrenamiento/CampoEntrenamiento';
 import { AlchemistWizard16Bit } from '../components/mapa/Sprites';
 import { TERRENOS, terrenoDeUnidad, ANCHO_LOGICO } from '../game/terreno';
 import { esTileTransitable, puntoInicio } from '../game/mapa';
@@ -20,6 +21,7 @@ const NOTA_MAX = 100;
 export default function PanelEstudiante() {
   const { user, refrescarEstudiante } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const wrapperMapaRef = useRef(null);  // Contenedor para medir la escala entera
   const esMovil = useMediaQuery('(max-width: 640px)');
 
@@ -30,7 +32,9 @@ export default function PanelEstudiante() {
   }, []);
 
   // 💡 Estados para la navegación de la barra inferior (Hotbar)
-  const [vistaHotbar, setVistaHotbar] = useState('mapa');
+  const [vistaHotbar, setVistaHotbar] = useState(() =>
+    searchParams.get('vista') === 'entrenamiento' ? 'entrenamiento' : 'mapa'
+  );
 
   // 💡 Escala entera del canvas (1x, 2x, 3x...) para evitar píxeles borrosos
   const [escalaMapa, setEscalaMapa] = useState(2);
@@ -43,7 +47,8 @@ export default function PanelEstudiante() {
   const [tareas, setTareas] = useState([]);
   const [misEntregas, setMisEntregas] = useState([]);
   const [gremio, setGremio] = useState([]);
-  const [boleta, setBoleta] = useState(null); // 📚 Boleta académica (nota 0-100 puntos)
+  const [boleta, setBoleta] = useState(null);
+  const [rachaResumen, setRachaResumen] = useState(null); // 📚 Boleta académica (nota 0-100 puntos)
 
   // 💡 Estados del Motor de Mapa 2D por Tiles y Ciudadelas
   const [heroPos, setHeroPos] = useState({ x: 15, y: 8 });
@@ -61,6 +66,15 @@ export default function PanelEstudiante() {
   const [respuestaAlquimista, setRespuestaAlquimista] = useState('');
   const [cargandoAlquimista, setCargandoAlquimista] = useState(false);
 
+  // 🔥 FUNCIÓN: Cargar racha diaria y precisión de entrenamiento para el HUD.
+  const cargarRacha = () => {
+    if (!user?.id) return;
+    fetch(`${API_URL}/api/estudiantes/${user.id}/racha`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => { if (data) setRachaResumen(data); })
+      .catch(() => setRachaResumen(null));
+  };
+
   // 💡 FUNCIÓN: Cargar toda la data de la base de datos al inicio
   const cargarDatos = () => {
     fetch(`${API_URL}/api/unidades`)
@@ -74,6 +88,7 @@ export default function PanelEstudiante() {
 
     if (user?.id) {
       refrescarEstudiante();
+      cargarRacha();
       fetch(`${API_URL}/api/calificaciones/estudiante/${user.id}`)
         .then(r => r.json())
         .then(setCalificaciones);
@@ -309,6 +324,8 @@ export default function PanelEstudiante() {
         examenesPendientes={examenesPendientes.length}
         tareasPendientes={tareasPendientes.length}
         hayTormenta={hayTormenta}
+        rachaActual={rachaResumen?.racha?.actual ?? 0}
+        metaDiariaCumplida={rachaResumen?.racha?.meta_diaria?.cumplida ?? false}
         onHablarAlquimista={() => setDialogoAlquimistaAbierto(true)}
       />
 
@@ -580,6 +597,16 @@ export default function PanelEstudiante() {
             </>
           )}
         </div>
+      )}
+
+      {vistaHotbar === 'entrenamiento' && (
+        <CampoEntrenamiento
+          estudianteId={user?.id}
+          onActividadRegistrada={() => {
+            cargarRacha();
+            refrescarEstudiante();
+          }}
+        />
       )}
 
       {vistaHotbar === 'perfil' && <PerfilEstudiante />}

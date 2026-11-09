@@ -34,7 +34,9 @@ Plataforma web gamificada con temática RPG para la gestión y evaluación acad�
 - **Jefes Finales** — Evaluaciones de opción múltiple con corrección automática, XP variable, retroalimentación por pregunta y **un solo intento** por mazmorra.
 - **Misiones de Laboratorio** — Tareas con entregas textuales (y adjuntos PDF/Word en Base64) que el profesor califica y retroalimenta.
 - **Sistema RPG completo** — XP, niveles, HP y títulos de clase que se recalculan automáticamente con cada calificación.
-- **Logros y medallas** — 14 trofeos desbloqueables ("Primer Sangre", "Conjuro Perfecto", "Racha de Laboratorio", "Racha de 7 Días"…) con barra de progreso, galería en el perfil, toast animado y XP de bonificación.
+- **Logros y medallas** — 19 trofeos desbloqueables ("Primer Sangre", "Conjuro Perfecto", "Racha de Laboratorio", "Racha de 7 Días"…) con barra de progreso, galería en el perfil, toast animado y XP de bonificación.
+- **Campo de Entrenamiento** — Práctica adaptativa sin nota que recomienda preguntas falladas y temas con bajo dominio, con retroalimentación inmediata y sin consumir el intento del jefe.
+- **Racha diaria y meta de constancia** — Calendario semanal, racha actual, mejor racha y meta diaria de una actividad; las medallas de constancia y entrenamiento otorgan XP.
 - **Ranking del Gremio** — Tabla de los mejores héroes ordenada por XP.
 - **Copiloto IA (Oráculo)** — Genera preguntas, ejemplos y misiones desde un tema, con respaldo local automático si no hay clave de API.
 - **Sesiones seguras en servidor** — Tokens de sesión almacenados en SQLite con cierre de sesión real.
@@ -141,7 +143,10 @@ Base URL: `http://localhost:4000` (configurable con `PORT`).
 | `POST` | `/api/auth/logout` | Cierre de sesión (elimina el token) |
 | `GET` | `/api/estudiantes` | Listado del gremio ordenado por XP |
 | `POST` / `DELETE` | `/api/estudiantes/:id` | Crear / eliminar estudiante |
-| `GET` | `/api/estudiantes/:id/logros` | Catálogo de 14 medallas con estado y progreso del héroe |
+| `GET` | `/api/estudiantes/:id/logros` | Catálogo de 19 medallas con estado y progreso del héroe |
+| `GET` | `/api/estudiantes/:id/racha` | Racha diaria, calendario semanal, meta y precisión de entrenamiento |
+| `GET` | `/api/estudiantes/:id/entrenamiento` | Preguntas recomendadas y dominio por tema (sin respuestas) |
+| `POST` | `/api/estudiantes/:id/entrenamiento/responder` | Registrar práctica, feedback inmediato y medallas desbloqueadas |
 | `GET` | `/api/gremio` | Top 8 héroes para el HUD del mapa |
 | `GET` / `POST` | `/api/temas` | Listar (con ejemplos) / crear biomas-tema |
 | `POST` / `DELETE` | `/api/ejemplos/:id` | Crear / eliminar pergaminos de estudio |

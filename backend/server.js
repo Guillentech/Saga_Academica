@@ -8,6 +8,11 @@ import { fileURLToPath } from 'node:url';
 import multer from 'multer';
 import db from './db.js';
 import { evaluarLogros, listarLogrosEstudiante } from './logros.js';
+import {
+  obtenerResumenEntrenamiento,
+  listarPreguntasEntrenamiento,
+  registrarRespuestaEntrenamiento
+} from './entrenamiento.js';
 
 dotenv.config();
 
@@ -283,6 +288,64 @@ app.get('/api/estudiantes/:id/logros', (req, res) => {
   if (nuevos.length > 0) sincronizarProgresoEstudiante(id);
 
   res.json({ ...listarLogrosEstudiante(id), nuevos });
+});
+
+// 🔥 RACHA DIARIA: resumen de constancia para el HUD del héroe.
+app.get('/api/estudiantes/:id/racha', (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: 'El identificador del estudiante no es válido.' });
+  }
+
+  const estudiante = db.prepare('SELECT id FROM estudiantes WHERE id = ?').get(id);
+  if (!estudiante) return res.status(404).json({ error: 'Estudiante no encontrado' });
+
+  res.json(obtenerResumenEntrenamiento(id));
+});
+
+// 🎯 CAMPO DE ENTRENAMIENTO: preguntas recomendadas sin nota y sin consumir el intento del jefe.
+app.get('/api/estudiantes/:id/entrenamiento', (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: 'El identificador del estudiante no es válido.' });
+  }
+
+  const estudiante = db.prepare('SELECT id FROM estudiantes WHERE id = ?').get(id);
+  if (!estudiante) return res.status(404).json({ error: 'Estudiante no encontrado' });
+
+  const resumen = obtenerResumenEntrenamiento(id);
+  const datos = listarPreguntasEntrenamiento(id, req.query.limite);
+  res.json({ ...resumen, ...datos });
+});
+
+// 🎯 Registrar una respuesta de práctica: feedback inmediato, racha y medallas.
+app.post('/api/estudiantes/:id/entrenamiento/responder', (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) {
+    return res.status(400).json({ error: 'El identificador del estudiante no es válido.' });
+  }
+
+  const estudiante = db.prepare('SELECT id FROM estudiantes WHERE id = ?').get(id);
+  if (!estudiante) return res.status(404).json({ error: 'Estudiante no encontrado' });
+
+  const { pregunta_id, opcion } = req.body || {};
+  if (!pregunta_id || !opcion) {
+    return res.status(400).json({ error: 'Faltan la pregunta o la opción elegida.' });
+  }
+
+  const resultado = registrarRespuestaEntrenamiento(id, Number(pregunta_id), opcion);
+  if (resultado.error) {
+    return res.status(400).json({ error: resultado.error });
+  }
+
+  const logrosDesbloqueados = evaluarLogros(id);
+  const perfilActualizado = sincronizarProgresoEstudiante(id);
+
+  res.json({
+    ...resultado,
+    logros_desbloqueados: logrosDesbloqueados,
+    estudiante: perfilActualizado
+  });
 });
 
 // 🛡️ Avatar del héroe: acepta un sprite preset o una imagen Base64 (máx. 2 MB).
