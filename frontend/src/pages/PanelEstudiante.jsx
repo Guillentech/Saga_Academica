@@ -39,6 +39,18 @@ export default function PanelEstudiante() {
   // 💡 Escala entera del canvas (1x, 2x, 3x...) para evitar píxeles borrosos
   const [escalaMapa, setEscalaMapa] = useState(2);
 
+  // 🧭 Filtros de vistas largas (MOCHILA, PERGAMINOS, BOLETA, LOGROS)
+  const [filtroTareas, setFiltroTareas] = useState('todas');
+  const [busquedaPergaminos, setBusquedaPergaminos] = useState('');
+  const [filtroBoleta, setFiltroBoleta] = useState('todas');
+  const [filtroLogros, setFiltroLogros] = useState('todas');
+
+  // 📂 Tarjetas de misión expandidas (por ID)
+  const [questCardExpandida, setQuestCardExpandida] = useState({});
+
+  // 📍 Posición de scroll para mostrar/ocultar botón "subir al inicio"
+  const [scrollY, setScrollY] = useState(0);
+
   // 💡 Estados para almacenar los datos traídos del Backend (SQLite)
   const [temas, setTemas] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -131,6 +143,13 @@ export default function PanelEstudiante() {
     return () => window.removeEventListener('resize', actualizarEscala);
   }, [vistaHotbar]);
 
+  // 📍 Detectar scroll para mostrar el botón "subir al inicio" en vistas largas
+  useEffect(() => {
+    const onScroll = () => setScrollY(window.scrollY);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   // ==========================================================================
   // 💡 DATOS DERIVADOS DEL MAPA CONTINENTAL Y DE LA UNIDAD ACTIVA
   // ==========================================================================
@@ -152,6 +171,50 @@ export default function PanelEstudiante() {
       entregas: misEntregas
     })];
   }));
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 📊 DERIVADOS DE FILTRO PARA VISTAS LARGAS (MOCHILA / PERGAMINOS / BOLETA / LOGROS)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  // MOCHILA: tareas filtradas y resumen de progreso
+  const tareasFiltradas = [...tareas]
+    .filter(t => {
+      const entrega = misEntregas.find(e => e.tarea_id === t.id);
+      if (filtroTareas === 'pendientes') return !entrega;
+      if (filtroTareas === 'entregadas') return !!entrega;
+      return true;
+    })
+    .sort((a, b) => {
+      const entA = misEntregas.some(e => e.tarea_id === a.id);
+      const entB = misEntregas.some(e => e.tarea_id === b.id);
+      if (entA && !entB) return 1;
+      if (!entA && entB) return -1;
+      return 0;
+    });
+
+  const resumenTareas = {
+    total: tareas.length,
+    pendientes: tareas.filter(t => !misEntregas.some(e => e.tarea_id === t.id)).length,
+    entregadas: misEntregas.filter(e => e.calificacion != null).length,
+  };
+
+  // PERGAMINOS: temas filtrados por búsqueda
+  const temasFiltrados = temas.filter(t =>
+    t.titulo.toLowerCase().includes(busquedaPergaminos.toLowerCase())
+  );
+
+  // BOLETA: rendimiento filtrado por tipo
+  const rendimientoFiltrado = boleta?.rendimiento.filter(r =>
+    filtroBoleta === 'todas' || r.tipo === filtroBoleta
+  ) ?? [];
+
+  // LOGROS: calificaciones filtradas por desempeño
+  const calificacionesFiltradas = calificaciones.filter(cal => {
+    const aprueba = cal.puntaje >= 60;
+    if (filtroLogros === 'aprobados') return aprueba;
+    if (filtroLogros === 'reprobados') return !aprueba;
+    return true;
+  });
 
   // ==========================================================================
   // 💡 MOVIMIENTO DEL HÉROE Y NAVEGACIÓN ENTRE CIUDADELAS
@@ -415,51 +478,126 @@ export default function PanelEstudiante() {
           3. SUB-VISTAS DE LA BARRA INFERIOR (INVENTARIO, PERGAMINOS, GREMIO, LOGROS)
          ===================================================================== */}
       {vistaHotbar === 'inventario' && (
-        <div className="card-pro">
-          <h3 className="pixel-font section-title section-title--gold">🎒 INVENTARIO Y MISIONES ({tareas.length})</h3>
-          {tareas.length === 0 && (
-            <p className="rpg-empty">Aún no hay misiones publicadas. El Game Master las dejará caer en tu inventario.</p>
+        <div className="vista-scroll card-pro">
+          <h3 className="pixel-font section-title section-title--gold">🎒 INVENTARIO Y MISIONES</h3>
+
+          <div className="vista-resumen">
+            <div className="vista-resumen__item">
+              <span className="vista-resumen__valor">{resumenTareas.total}</span>
+              <span className="vista-resumen__etiqueta">Tareas totales</span>
+            </div>
+            <div className="vista-resumen__item">
+              <span className="vista-resumen__valor">{resumenTareas.pendientes}</span>
+              <span className="vista-resumen__etiqueta">Pendientes</span>
+            </div>
+            <div className="vista-resumen__item">
+              <span className="vista-resumen__valor">{resumenTareas.entregadas}</span>
+              <span className="vista-resumen__etiqueta">Calificadas</span>
+            </div>
+          </div>
+
+          <div className="filtro-tareas">
+            <button
+              type="button"
+              className={`filtro-chip ${filtroTareas === 'todas' ? 'is-active' : ''} filtro-chip--todas`}
+              onClick={() => setFiltroTareas('todas')}
+            >
+              Todas ({resumenTareas.total})
+            </button>
+            <button
+              type="button"
+              className={`filtro-chip ${filtroTareas === 'pendientes' ? 'is-active' : ''} filtro-chip--pendientes`}
+              onClick={() => setFiltroTareas('pendientes')}
+            >
+              Pendientes ({resumenTareas.pendientes})
+            </button>
+            <button
+              type="button"
+              className={`filtro-chip ${filtroTareas === 'entregadas' ? 'is-active' : ''} filtro-chip--entregadas`}
+              onClick={() => setFiltroTareas('entregadas')}
+            >
+              Entregadas ({resumenTareas.entregadas})
+            </button>
+          </div>
+
+          {tareasFiltradas.length === 0 && (
+            <p className="rpg-empty">No hay misiones con este filtro.</p>
           )}
-          {tareas.map(tar => {
+          {tareasFiltradas.map(tar => {
             const entrega = misEntregas.find(e => e.tarea_id === tar.id);
+            const expandida = !!questCardExpandida[tar.id];
             return (
-              <div key={tar.id} className="quest-card">
+              <div
+                key={tar.id}
+                className={`quest-card quest-card--compact ${expandida ? '' : ''}`}
+                onClick={() => setQuestCardExpandida(prev => ({ ...prev, [tar.id]: !expandida }))}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && setQuestCardExpandida(prev => ({ ...prev, [tar.id]: !expandida }))}
+              >
                 <div className="quest-card__head">
-                  <h4 className="quest-card__title">⚔️ {tar.titulo} <span className="text-muted">({tar.tema_titulo})</span></h4>
+                  <h4 className="quest-card__title">
+                    ⚔️ {tar.titulo}
+                    <span className="text-muted">({tar.tema_titulo})</span>
+                  </h4>
                   <span className={`badge ${entrega ? 'badge-success' : 'badge-danger'}`}>
                     {entrega ? 'Entregada' : 'Pendiente'}
                   </span>
                 </div>
-                <p className="quest-card__desc">{tar.descripcion}</p>
 
-                <span className="quest-card__meta text-xp">
-                  📚 Vale {tar.puntos_max ?? 10} de 100 pts de la materia
-                  {entrega?.calificacion != null && (
-                    <> • Tu nota: {entrega.calificacion}% = <strong>{entrega.puntos_ganados ?? '—'} pts</strong></>
+                <div className="quest-card__resumen">
+                  <span>
+                    📚 {tar.puntos_max ?? 10} pts
+                    {entrega?.calificacion != null && ` • ${entrega.calificacion}%`}
+                  </span>
+                  {expandida && (
+                    <span className="ui-px" style={{ fontSize: '7px' }}>
+                      {expandida ? '▲ comprimir' : '▼ expandir'}
+                    </span>
                   )}
-                  {entrega && entrega.calificacion == null && <> • Esperando calificación del Game Master</>}
-                </span>
+                </div>
 
-                {tar.archivo_adjunto && (
-                  <a
-                    href={tar.archivo_adjunto}
-                    download={`Guia_Mision_${tar.titulo.replace(/\s+/g, '_')}`}
-                    className="quest-file"
-                  >
-                    📄 Descargar Documento Adjunto
-                  </a>
+                {expandida && (
+                  <>
+                    <p className="quest-card__desc" style={{ marginTop: '0.5rem' }}>{tar.descripcion}</p>
+
+                    <span className="quest-card__meta text-xp" style={{ marginTop: '0.25rem' }}>
+                      📚 Vale {tar.puntos_max ?? 10} de 100 pts de la materia
+                      {entrega?.calificacion != null && (
+                        <> • Tu nota: {entrega.calificacion}% = <strong>{entrega.puntos_ganados ?? '—'} pts</strong></>
+                      )}
+                      {entrega && entrega.calificacion == null && <> • Esperando calificación del Game Master</>}
+                    </span>
+
+                    {tar.archivo_adjunto && (
+                      <a
+                        href={tar.archivo_adjunto}
+                        download={`Guia_Mision_${tar.titulo.replace(/\s+/g, '_')}`}
+                        className="quest-file"
+                        style={{ marginTop: '0.3rem' }}
+                      >
+                        📄 Descargar Documento Adjunto
+                      </a>
+                    )}
+
+                    <textarea
+                      className="input-pro"
+                      rows="3"
+                      placeholder="Escribe aquí tu código o respuesta de la misión..."
+                      value={entregaTexto[tar.id] || ''}
+                      onChange={(e) => setEntregaTexto({ ...entregaTexto, [tar.id]: e.target.value })}
+                      style={{ marginTop: '0.5rem' }}
+                    />
+                    <button
+                      onClick={() => enviarTrabajo(tar.id)}
+                      disabled={enviandoTarea}
+                      className="btn-pro btn-pro-primary btn-block"
+                      style={{ marginTop: '0.5rem' }}
+                    >
+                      <Send size={15} /> {entrega ? 'Actualizar Misión' : 'Enviar Misión'}
+                    </button>
+                  </>
                 )}
-
-                <textarea
-                  className="input-pro"
-                  rows="3"
-                  placeholder="Escribe aquí tu código o respuesta de la misión..."
-                  value={entregaTexto[tar.id] || ''}
-                  onChange={(e) => setEntregaTexto({ ...entregaTexto, [tar.id]: e.target.value })}
-                />
-                <button onClick={() => enviarTrabajo(tar.id)} disabled={enviandoTarea} className="btn-pro btn-pro-primary btn-block" style={{ marginTop: '0.5rem' }}>
-                  <Send size={15} /> {entrega ? 'Actualizar Misión' : 'Enviar Misión'}
-                </button>
               </div>
             );
           })}
@@ -467,22 +605,56 @@ export default function PanelEstudiante() {
       )}
 
       {vistaHotbar === 'pergaminos' && (
-        <div className="card-pro">
+        <div className="vista-scroll card-pro">
           <h3 className="pixel-font section-title section-title--xp">📜 PERGAMINOS DE TEORÍA</h3>
-          {temas.length === 0 && (
-            <p className="rpg-empty">La biblioteca aún está vacía. Consulta al Sabio Alquimista AI mientras tanto.</p>
-          )}
-          {temas.map(t => (
-            <div key={t.id} className="scroll-entry">
-              <h4 className="scroll-entry__title">{t.titulo}</h4>
-              <p className="scroll-entry__desc">{t.descripcion}</p>
-              {t.ejemplos?.map(ej => (
-                <pre key={ej.id} className="rpg-code">
-                  <strong>// {ej.titulo}</strong>{'\n'}{ej.contenido}
-                </pre>
-              ))}
+
+          <div className="vista-resumen">
+            <div className="vista-resumen__item">
+              <span className="vista-resumen__valor">{temasFiltrados.length}</span>
+              <span className="vista-resumen__etiqueta">Pergamínos disponibles</span>
             </div>
-          ))}
+          </div>
+
+          <input
+            type="text"
+            className="input-pro busqueda-pergaminos"
+            placeholder="Buscar pergamino por título..."
+            value={busquedaPergaminos}
+            onChange={(e) => setBusquedaPergaminos(e.target.value)}
+          />
+
+          {temasFiltrados.length === 0 && (
+            <p className="rpg-empty">No se encontraron pergamínos con ese título.</p>
+          )}
+          {temasFiltrados.map(t => {
+            const expandida = !!questCardExpandida[`pergamino-${t.id}`];
+            return (
+              <div
+                key={t.id}
+                className={`scroll-entry ${expandida ? '' : 'scroll-entry--colapsado'}`}
+                onClick={() => setQuestCardExpandida(prev => ({ ...prev, [`pergamino-${t.id}`]: !expandida }))}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && setQuestCardExpandida(prev => ({ ...prev, [`pergamino-${t.id}`]: !expandida }))}
+              >
+                <h4 className="scroll-entry__title">{t.titulo}</h4>
+                {!expandida && <p className="scroll-entry__desc">{t.descripcion}</p>}
+                {expandida && (
+                  <>
+                    <p className="scroll-entry__desc">{t.descripcion}</p>
+                    <span className="codigo-colapsable-toggle" style={{ display: 'inline-block', marginTop: '0.3rem' }}>
+                      {expandida ? '▲ comprimir ejemplos' : '▼ ver ejemplos de código'}
+                    </span>
+                    {t.ejemplos?.map(ej => (
+                      <pre key={ej.id} className="rpg-code">
+                        <strong>// {ej.titulo}</strong>{'\n'}{ej.contenido}
+                      </pre>
+                    ))}
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -512,7 +684,7 @@ export default function PanelEstudiante() {
       )}
 
       {vistaHotbar === 'boleta' && (
-        <div className="card-pro">
+        <div className="vista-scroll card-pro">
           <h3 className="pixel-font section-title section-title--gold">🎓 BOLETA DE LA MATERIA</h3>
 
           {!boleta ? (
@@ -545,11 +717,35 @@ export default function PanelEstudiante() {
                 (nunca supera {boleta.nota_max}). La XP y el nivel son progresión de tu héroe y <strong>no afectan la nota</strong>.
               </p>
 
-              <h4 className="zone-column__title">📜 ACTIVIDADES CALIFICADAS ({boleta.rendimiento.length})</h4>
-              {boleta.rendimiento.length === 0 && (
-                <p className="rpg-empty">Aún no has ganado puntos. ¡Rinde un examen o entrega una misión!</p>
+              <div className="filtro-boleta">
+                <button
+                  type="button"
+                  className={`filtro-chip ${filtroBoleta === 'todas' ? 'is-active' : ''} filtro-chip--todas`}
+                  onClick={() => setFiltroBoleta('todas')}
+                >
+                  Todas ({boleta.rendimiento.length})
+                </button>
+                <button
+                  type="button"
+                  className={`filtro-chip ${filtroBoleta === 'examen' ? 'is-active' : ''} filtro-chip--pendientes`}
+                  onClick={() => setFiltroBoleta('examen')}
+                >
+                  Exámenes ({boleta.rendimiento.filter(r => r.tipo === 'examen').length})
+                </button>
+                <button
+                  type="button"
+                  className={`filtro-chip ${filtroBoleta === 'mision' ? 'is-active' : ''} filtro-chip--entregadas`}
+                  onClick={() => setFiltroBoleta('mision')}
+                >
+                  Misiones ({boleta.rendimiento.filter(r => r.tipo !== 'examen').length})
+                </button>
+              </div>
+
+              <h4 className="zone-column__title">📜 ACTIVIDADES CALIFICADAS ({rendimientoFiltrado.length})</h4>
+              {rendimientoFiltrado.length === 0 && (
+                <p className="rpg-empty">No hay actividades con este filtro.</p>
               )}
-              {boleta.rendimiento.length > 0 && (
+              {rendimientoFiltrado.length > 0 && (
                 <div className="rpg-table-wrap">
                   <table>
                     <thead>
@@ -562,7 +758,7 @@ export default function PanelEstudiante() {
                       </tr>
                     </thead>
                     <tbody>
-                      {boleta.rendimiento.map((r) => (
+                      {rendimientoFiltrado.map((r) => (
                         <tr key={`${r.tipo}-${r.registro_id}`}>
                           <td className="text-strong">{r.actividad}</td>
                           <td>{r.tipo === 'examen' ? '⚔️ Examen' : '🎒 Misión'}</td>
@@ -612,16 +808,68 @@ export default function PanelEstudiante() {
       {vistaHotbar === 'perfil' && <PerfilEstudiante />}
 
       {vistaHotbar === 'logros' && (
-        <div className="card-pro">
+        <div className="vista-scroll card-pro">
           <h3 className="pixel-font section-title section-title--gold">🏆 LOGROS Y RESULTADOS</h3>
+
+          <div className="vista-resumen">
+            <div className="vista-resumen__item">
+              <span className="vista-resumen__valor">{calificaciones.length}</span>
+              <span className="vista-resumen__etiqueta">Actividades</span>
+            </div>
+            <div className="vista-resumen__item">
+              <span className="vista-resumen__valor">
+                {calificaciones.filter(c => c.puntaje >= 60).length}
+              </span>
+              <span className="vista-resumen__etiqueta">Aprobadas</span>
+            </div>
+            <div className="vista-resumen__item">
+              <span className="vista-resumen__valor">
+                {calificaciones.length > 0
+                  ? Math.round((calificaciones.filter(c => c.puntaje >= 60).length / calificaciones.length) * 100)
+                  : 0}%
+              </span>
+              <span className="vista-resumen__etiqueta">Tasa de éxito</span>
+            </div>
+          </div>
+
+          <div className="filtro-tareas">
+            <button
+              type="button"
+              className={`filtro-chip ${filtroLogros === 'todas' ? 'is-active' : ''} filtro-chip--todas`}
+              onClick={() => setFiltroLogros('todas')}
+            >
+              Todas ({calificaciones.length})
+            </button>
+            <button
+              type="button"
+              className={`filtro-chip ${filtroLogros === 'aprobados' ? 'is-active' : ''} filtro-chip--entregadas`}
+              onClick={() => setFiltroLogros('aprobados')}
+            >
+              Aprobadas ({calificaciones.filter(c => c.puntaje >= 60).length})
+            </button>
+            <button
+              type="button"
+              className={`filtro-chip ${filtroLogros === 'reprobados' ? 'is-active' : ''} filtro-chip--pendientes`}
+              onClick={() => setFiltroLogros('reprobados')}
+            >
+              Reprobadas ({calificaciones.filter(c => c.puntaje < 60).length})
+            </button>
+          </div>
+
           <p className="section-sub">
             📚 Escala de la materia: 0 a {NOTA_MAX} puntos. Tu nota actual es <strong>{boleta?.nota_materia ?? 0} / {NOTA_MAX} pts</strong>.
             La XP y el nivel no afectan la nota.
           </p>
-          {calificaciones.length === 0 && (
-            <p className="rpg-empty">Todavía no has librado ningún combate. ¡Entra a un bioma y desafía a su Jefe!</p>
+
+          {calificacionesFiltradas.length === 0 && (
+            <p className="rpg-empty">
+              {filtroLogros !== 'todas'
+                ? `No hay actividades ${filtroLogros === 'aprobados' ? 'aprobadas' : 'reprobadas'} aún.`
+                : 'Todavía no has librado ningún combate. ¡Entra a un bioma y desafía a su Jefe!'
+              }
+            </p>
           )}
-          {calificaciones.map(cal => (
+          {calificacionesFiltradas.map(cal => (
             <div key={cal.id} className="achievement-row">
               <div>
                 <strong className="achievement-row__title">{cal.evaluacion_titulo}</strong>
@@ -639,6 +887,19 @@ export default function PanelEstudiante() {
           4. BOTTOM HUD (HOTBAR DE INVENTARIO CLÁSICA)
          ===================================================================== */}
       <GameHotbar activa={vistaHotbar} onChange={setVistaHotbar} />
+
+      {/* 📍 Botón flotante "subir al inicio" (solo aparece tras scrollear) */}
+      {scrollY > 200 && (
+        <button
+          type="button"
+          className="btn-subir is-visible"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'auto' })}
+          aria-label="Subir al inicio de la página"
+        >
+          ↑
+        </button>
+      )}
+
     </div>
     </div>
   );

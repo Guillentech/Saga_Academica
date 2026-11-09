@@ -3541,6 +3541,7 @@ body.home-active .header-pro {
 
 /* Cursor de espada: sólo punteros finos (nunca en táctil) */
 @media (hover: hover) and (pointer: fine) {
+  /* Portal del estudiante (Home) — ya existía */
   .portal-shell--student,
   .portal-shell--student .role-cta,
   .portal-shell--student .pixel-btn {
@@ -3549,8 +3550,66 @@ body.home-active .header-pro {
       pointer;
   }
 
+  /* Botones y controles interactivos en todas las páginas */
+  .btn,
+  .btn-pro,
+  .btn-danger,
+  .btn-retroceso,
+  .btn-salir,
+  .btn-guest,
+  .pixel-btn,
+  .btn-icon,
+  .btn-theme-toggle,
+  .bgm-fab,
+  .bgm-chip,
+  .bgm-icon-btn,
+  /* Tarjetas y paneles clickeables */
+  .card,
+  .card-pro,
+  .rpg-biome-node,
+  .ciudadela-card,
+  .role-card,
+  /* Nodos y hitos de mapa */
+  .px-nodo,
+  .map-node,
+  .map-hito,
+  /* Hotbar inferior */
+  .rpg-hotbar-slot,
+  /* Opciones, pestañas y chips */
+  .rpg-option,
+  .rpg-turn-btn,
+  .rpg-tab,
+  .rpg-chip,
+  .token-chip,
+  .perfil-avatar-option,
+  .logros-filtro,
+  /* Navegación y acciones de página */
+  .mapa-volver,
+  .auth-link,
+  .hud-avatar,
+  .hud-avatar--gold,
+  .profile-avatar__upload,
+  .gradebook__name,
+  /* Portal del docente */
+  .portal-shell--teacher {
+    cursor: url('/cursors/espada-neon.png') 27 3,
+      url('/cursors/espada-neon.svg') 27 3,
+      pointer;
+  }
+
+  /* Texto y lecturas dentro de contenedores interactivos: cursor normal */
   .portal-shell--student .role-copy,
-  .portal-shell--student .role-title {
+  .portal-shell--student .role-title,
+  .role-copy,
+  .role-title,
+  .auth-subtitle,
+  .section-sub,
+  .feature-copy,
+  .roster-name,
+  .roster-meta,
+  .hud-name,
+  .hud-role,
+  .hud-token {
     cursor: auto;
   }
 }
@@ -4442,4 +4501,141 @@ body.auth-teacher-active .header-pro {
   .logros-grid { grid-template-columns: 1fr; }
   .logros-panel__marcador { margin-left: auto; }
   .toast-logros { top: 0.5rem; right: 0.5rem; width: calc(100vw - 1rem); }
+}
+
+/* =====================================================================
+   UX PANEL ESTUDIANTE — reducir scroll en vistas largas
+   ---------------------------------------------------------------------
+   · Contenedores con scroll interno para que HUD y hotbar queden fijos.
+   · Chips de filtro, tarjetas compactas, ejemplos colapsables y botón
+     "subir al inicio" con estilo pixel-art (box-shadow 0 blur, sin radius).
+   ===================================================================== */
+
+/* Contenedor de vista larga: scrolleo interno, HUD y hotbar fijos */
+.vista-scroll {
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-hi) var(--panel-lo);
+  padding-right: 4px;
+}
+.vista-scroll::-webkit-scrollbar { width: 10px; }
+.vista-scroll::-webkit-scrollbar-track { background: var(--panel-lo); }
+.vista-scroll::-webkit-scrollbar-thumb {
+  background: var(--panel-hi);
+  box-shadow: inset 0 0 0 2px var(--panel-lo);
+}
+
+/* Botón flotante "subir al inicio" */
+.btn-subir {
+  position: fixed;
+  right: 1rem;
+  bottom: 4.2rem; /* por encima del BGM y hotbar */
+  z-index: 50;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border: 0; cursor: pointer;
+  color: var(--bone);
+  background: var(--panel-hi);
+  box-shadow:
+    0 -2px 0 0 var(--ink), 0 2px 0 0 var(--ink),
+    -2px 0 0 0 var(--ink), 2px 0 0 0 var(--ink),
+    inset 2px 2px 0 0 var(--violet-hi), inset -2px -2px 0 0 var(--panel-lo);
+  font-family: var(--font-px); font-size: 10px; line-height: 1;
+}
+.btn-subir:not(.is-visible) { display: none; }
+.btn-subir:hover { transform: translateY(-2px); color: var(--gold); }
+
+/* Barra de resumen de progreso (MOCHILA / LOGROS) */
+.vista-resumen {
+  display: flex; gap: 0.5rem; flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--panel-hi);
+}
+.vista-resumen__item { flex: 1 1 140px; min-width: 0; }
+.vista-resumen__valor {
+  display: block; font-family: var(--font-px); font-size: 12px;
+  color: var(--gold); line-height: 1.4;
+}
+.vista-resumen__etiqueta {
+  display: block; font-size: 15px; color: var(--text-muted); margin-top: 1px;
+}
+
+/* Chips de filtro (reutiliza estilo de .logros-filtro) */
+.filtro-tareas {
+  display: flex; gap: 0.4rem; flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+.filtro-chip {
+  --tone: var(--panel-hi);
+  font-family: var(--font-px);
+  font-size: 8px; line-height: 1.6;
+  padding: 0.45rem 0.7rem;
+  color: var(--mute);
+  background: var(--panel-lo);
+  border: 0; cursor: pointer;
+  box-shadow: 0 0 0 2px var(--tone), inset 2px 2px 0 0 rgba(0,0,0,0.35);
+}
+.filtro-chip:hover { color: var(--text-main); box-shadow: 0 0 0 2px var(--edge-soft); }
+.filtro-chip.is-active {
+  color: var(--ink);
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--ink), inset 2px 2px 0 0 rgba(255,255,255,0.45);
+}
+.filtro-chip--pendientes { --tone: var(--hp-lo); }
+.filtro-chip--entregadas { --tone: var(--xp-lo); }
+.filtro-chip--todas { --tone: var(--student-lo); }
+
+/* Tarjeta de misión compacta (MOCHILA) */
+.quest-card--compact {
+  padding: 0.55rem 0.65rem;
+  margin-bottom: 0.5rem;
+}
+.quest-card--compact .quest-card__head {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 0.6rem; margin-bottom: 0.35rem;
+}
+.quest-card--compact .quest-card__title {
+  font-size: 17px; margin: 0;
+}
+.quest-card__resumen {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 0.6rem; font-size: 15px; color: var(--text-muted);
+}
+.quest-card__resumen strong { color: var(--text-main); }
+.quest-card--compact .quest-card__desc { display: none; }
+.quest-card--compact .quest-file { display: none; }
+.quest-card--compact textarea { display: none; }
+.quest-card--compact .btn-pro { width: auto; }
+
+/* Entrada de pergamino colapsable (PERGAMINOS) */
+.scroll-entry--colapsado .rpg-code { display: none; }
+.scroll-entry--colapsado .scroll-entry__desc { display: none; }
+.codigo-colapsable-toggle {
+  margin-top: 0.3rem; font-family: var(--font-px); font-size: 8px;
+  color: var(--gold); cursor: pointer; text-decoration: none;
+}
+.codigo-colapsable-toggle::before { content: "▶ "; }
+.scroll-entry:not(.scroll-entry--colapsado) .codigo-colapsable-toggle::before {
+  content: "▼ ";
+}
+
+/* Búsqueda de pergaminos */
+.busqueda-pergaminos {
+  width: 100%; max-width: 420px; margin-bottom: 0.9rem;
+}
+
+/* Filtro de boleta por tipo */
+.filtro-boleta {
+  display: flex; gap: 0.4rem; flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+
+/* Responsive: menos altura máxima en móvil */
+@media (max-width: 640px) {
+  .vista-scroll { max-height: calc(100vh - 320px); }
+  .btn-subir { bottom: 3.2rem; right: 0.5rem; }
+  .vista-resumen__item { flex: 1 1 100%; }
 }

@@ -145,7 +145,11 @@ export default function MapaCanvas({ terreno, onTileClick, activo = true, classN
       height={ALTO_LOGICO}
       onClick={manejarClick}
       className={`pixel-canvas ${className}`.trim()}
-      style={{ cursor: onTileClick ? 'pointer' : 'default' }}
+      style={{
+        cursor: onTileClick
+          ? "url('/cursors/espada-neon.png') 27 3, url('/cursors/espada-neon.svg') 27 3, pointer"
+          : 'default',
+      }}
     />
   );
 }
