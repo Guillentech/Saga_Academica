@@ -64,6 +64,14 @@ export default function PanelProfesor() {
   const [calificaciones, setCalificaciones] = useState([]); // Historial de combates
   const [tareas, setTareas] = useState([]);                 // Misiones prácticas
 
+  // 📚 Libro de notas consolidado y ficha académica del docente
+  const [libroNotas, setLibroNotas] = useState(null);
+  const [vistaNotas, setVistaNotas] = useState('libro'); // 'libro' | 'cronicas'
+  const [filtroUnidadLibro, setFiltroUnidadLibro] = useState('');
+  const [estudianteBoleta, setEstudianteBoleta] = useState(null);
+  const [boletaDocente, setBoletaDocente] = useState(null);
+  const [cargandoBoleta, setCargandoBoleta] = useState(false);
+
   // --------------------------------------------------------------------------
   // 🧙‍♂️ ESTADO DEL PERFIL DEL GAME MASTER
   // --------------------------------------------------------------------------
@@ -124,6 +132,7 @@ export default function PanelProfesor() {
   const [evalXp, setEvalXp] = useState(350);
   const [evalPuntos, setEvalPuntos] = useState(30); // 📚 Puntos de la materia que vale este examen
 
+  const [tareaTemaId, setTareaTemaId] = useState('');
   const [tareaCategoriaLibre, setTareaCategoriaLibre] = useState('');
   const [tareaTitulo, setTareaTitulo] = useState('');
   const [tareaDesc, setTareaDesc] = useState('');
@@ -144,6 +153,13 @@ export default function PanelProfesor() {
   // ==========================================================================
   // 🔄 FUNCIÓN PARA CARGAR TODOS LOS DATOS DEL SERVIDOR BACKEND
   // ==========================================================================
+  const cargarLibroNotas = () => {
+    fetch(`${API_URL}/api/libro-notas`)
+      .then(r => r.json())
+      .then(setLibroNotas)
+      .catch(() => setLibroNotas(null));
+  };
+
   const cargarDatos = () => {
     fetch(`${API_URL}/api/estudiantes`).then(r => r.json()).then(setEstudiantes);
     fetch(`${API_URL}/api/unidades`).then(r => r.json()).then(setUnidades);
@@ -151,6 +167,7 @@ export default function PanelProfesor() {
     fetch(`${API_URL}/api/evaluaciones`).then(r => r.json()).then(setEvaluaciones);
     fetch(`${API_URL}/api/calificaciones`).then(r => r.json()).then(setCalificaciones);
     fetch(`${API_URL}/api/tareas`).then(r => r.json()).then(setTareas);
+    cargarLibroNotas();
   };
 
   useEffect(() => {
@@ -247,12 +264,12 @@ export default function PanelProfesor() {
   };
 
   const guardarTareaDesdeIA = async (temaId) => {
-    const idSeguro = temaId || (temas.length > 0 ? temas[0].id : 1);
+    if (!temaId) return alert("Selecciona a qué Bioma o Ciudadela deseas vincular esta Misión.");
     const res = await fetch(`${API_URL}/api/tareas`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        tema_id: idSeguro,
+        tema_id: temaId,
         titulo: respuestaIA.resultado.titulo,
         descripcion: respuestaIA.resultado.descripcion,
         fecha_limite: 'Viernes 23:59 hrs',
@@ -416,17 +433,7 @@ export default function PanelProfesor() {
   const crearTareaIndependiente = async (e) => {
     e.preventDefault();
     if (!tareaTitulo.trim() || !tareaDesc.trim()) return;
-
-    let temaIdSeguro = temas.length > 0 ? temas[0].id : null;
-    if (!temaIdSeguro) {
-      const resTema = await fetch(`${API_URL}/api/temas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo: 'Gremio General', descripcion: 'Misiones generales del curso', bioma: 'bosque' })
-      });
-      const nuevoTema = await resTema.json();
-      temaIdSeguro = nuevoTema.id;
-    }
+    if (!tareaTemaId) return alert('Selecciona el Bioma o Ciudadela donde vivirá esta Misión.');
 
     const prefijo = tareaCategoriaLibre.trim() ? `[${tareaCategoriaLibre.trim()}] ` : '';
 
@@ -434,7 +441,7 @@ export default function PanelProfesor() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        tema_id: temaIdSeguro,
+        tema_id: tareaTemaId,
         titulo: `${prefijo}${tareaTitulo.trim()}`,
         descripcion: tareaDesc.trim(),
         fecha_limite: tareaFecha.trim() || 'Viernes 23:59 hrs',
@@ -444,6 +451,7 @@ export default function PanelProfesor() {
     });
 
     if (res.ok) {
+      setTareaTemaId('');
       setTareaTitulo('');
       setTareaDesc('');
       setTareaFecha('');
@@ -492,6 +500,45 @@ export default function PanelProfesor() {
     const res = await fetch(`${API_URL}/api/tareas/${tarea.id}/entregas`);
     const data = await res.json();
     setEntregasTarea(data);
+  };
+
+  // 🎓 Abre la boleta académica de un héroe desde el libro de notas.
+  const verBoletaEstudiante = async (estudiante) => {
+    setEstudianteBoleta(estudiante);
+    setBoletaDocente(null);
+    setCargandoBoleta(true);
+    try {
+      const res = await fetch(`${API_URL}/api/estudiantes/${estudiante.id}/boleta`);
+      if (res.ok) setBoletaDocente(await res.json());
+      else setBoletaDocente(null);
+    } catch {
+      setBoletaDocente(null);
+    } finally {
+      setCargandoBoleta(false);
+    }
+  };
+
+  // 🗂️ Selector de biomas agrupado por Ciudadela para vincular misiones y contenido.
+  const renderOpcionesTemas = () => {
+    const temasSinUnidad = temas.filter(t => t.unidad_id == null);
+    return (
+      <>
+        {unidades.map(unidad => {
+          const temasUnidad = temas.filter(t => Number(t.unidad_id) === Number(unidad.id));
+          if (temasUnidad.length === 0) return null;
+          return (
+            <optgroup key={`unidad-${unidad.id}`} label={`Unidad ${unidad.numero} · ${unidad.nombre}`}>
+              {temasUnidad.map(tema => <option key={tema.id} value={tema.id}>{tema.titulo}</option>)}
+            </optgroup>
+          );
+        })}
+        {temasSinUnidad.length > 0 && (
+          <optgroup label="Campamento del Gremio (sin unidad)">
+            {temasSinUnidad.map(tema => <option key={tema.id} value={tema.id}>{tema.titulo}</option>)}
+          </optgroup>
+        )}
+      </>
+    );
   };
 
   const guardarCalificacionEntrega = async (entregaId) => {
@@ -560,6 +607,12 @@ export default function PanelProfesor() {
     evaluaciones.reduce((acc, ev) => acc + (Number(ev.puntos_max) || 0), 0) +
     tareas.reduce((acc, t) => acc + (Number(t.puntos_max) || 0), 0);
   const puntosRestantes = Math.max(0, NOTA_MAX - puntosAsignados);
+  const entregasPorCalificar = tareas.reduce((acc, t) => acc + (Number(t.entregas_pendientes) || 0), 0);
+
+  // 📚 Columnas del libro de notas según la ciudadela seleccionada.
+  const actividadesLibro = (libroNotas?.actividades || []).filter(
+    (actividad) => !filtroUnidadLibro || String(actividad.unidad_id) === String(filtroUnidadLibro)
+  );
 
   const exportarCalificacionesCSV = () => {
     if (calificaciones.length === 0) return alert("No hay combates registrados para exportar.");
@@ -567,11 +620,54 @@ export default function PanelProfesor() {
     const filas = calificaciones.map(c => 
       `"${c.estudiante_nombre}","${c.codigo_unico}","${c.evaluacion_titulo}",${c.aciertos}/${c.total_preguntas},${c.puntaje}%,${c.puntos_ganados ?? 0}/${c.puntos_max ?? '-'} pts,+${c.xp_ganada || c.puntaje * 3} XP,${c.puntaje >= 60 ? 'Jefe Derrotado' : 'Caido en Combate'},"${c.fecha}"`
     ).join("\n");
-    const blob = new Blob([encabezados + filas], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\uFEFF${encabezados}${filas}`], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = `Reporte_Gremio_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+  };
+
+  const exportarLibroNotasCSV = () => {
+    if (!libroNotas || libroNotas.estudiantes.length === 0) {
+      return alert('No hay estudiantes registrados para exportar el libro de notas.');
+    }
+    const escapar = (valor) => `"${String(valor ?? '').replace(/"/g, '""')}"`;
+    const encabezados = [
+      'Estudiante',
+      'Token',
+      ...actividadesLibro.map((actividad) => (
+        `${actividad.tipo === 'examen' ? 'Jefe' : 'Misión'}: ${actividad.titulo} (${actividad.puntos_max} pts)`
+      )),
+      'Nota final',
+      'Pendientes'
+    ];
+    const filas = libroNotas.estudiantes.map((estudiante) => {
+      const celdas = actividadesLibro.map((actividad) => {
+        const celda = estudiante.actividades[actividad.clave];
+        if (!celda) return '—';
+        if (celda.calificado) return `${celda.puntos_ganados}/${actividad.puntos_max}`;
+        return celda.entregada ? 'Sin calificar' : '—';
+      });
+      const pendientes = actividadesLibro.filter(
+        (actividad) => !estudiante.actividades[actividad.clave]?.calificado
+      ).length;
+      return [
+        estudiante.nombre,
+        estudiante.codigo_unico,
+        ...celdas,
+        `${estudiante.nota_materia}/${libroNotas.nota_max}`,
+        pendientes
+      ];
+    });
+    const contenido = [encabezados, ...filas]
+      .map((fila) => fila.map(escapar).join(','))
+      .join('\n');
+    const blob = new Blob([`\uFEFF${contenido}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Libro_Notas_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   };
 
@@ -818,7 +914,7 @@ export default function PanelProfesor() {
                   <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                     <select id="tema-ejemplo-ia" className="input-pro" style={{ flex: '1 1 200px' }}>
                       <option value="">Seleccionar Bioma...</option>
-                      {temas.map(t => <option key={t.id} value={t.id}>{t.titulo}</option>)}
+                      {renderOpcionesTemas()}
                     </select>
                     <button onClick={() => guardarEjemploDesdeIA(document.getElementById('tema-ejemplo-ia').value)} className="btn-pro btn-pro-primary">
                       <PlusCircle size={16} /> Publicar Pergamino
@@ -831,9 +927,15 @@ export default function PanelProfesor() {
                 <div className="ai-output">
                   <h4 className="ai-result-title">🛡️ {respuestaIA.resultado.titulo}</h4>
                   <p style={{ whiteSpace: 'pre-wrap', fontSize: '20px', color: 'var(--text-main)' }}>{respuestaIA.resultado.descripcion}</p>
-                  <button onClick={() => guardarTareaDesdeIA()} className="btn-pro btn-pro-primary btn-block" style={{ marginTop: '1rem' }}>
-                    <PlusCircle size={16} /> Publicar Misión en el Gremio
-                  </button>
+                  <div style={{ marginTop: '1rem', display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <select id="tema-tarea-ia" className="input-pro" style={{ flex: '1 1 220px' }}>
+                      <option value="">Seleccionar Bioma...</option>
+                      {renderOpcionesTemas()}
+                    </select>
+                    <button onClick={() => guardarTareaDesdeIA(document.getElementById('tema-tarea-ia').value)} className="btn-pro btn-pro-primary">
+                      <PlusCircle size={16} /> Publicar Misión en el Gremio
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1143,7 +1245,19 @@ export default function PanelProfesor() {
               </h3>
               <form onSubmit={crearTareaIndependiente}>
                 <div className="input-group">
-                  <label className="input-label">Categoría o Tema Libre:</label>
+                  <label className="input-label">Ciudadela / Bioma de la Misión:</label>
+                  <select
+                    className="input-pro"
+                    value={tareaTemaId}
+                    onChange={(e) => setTareaTemaId(e.target.value)}
+                    required
+                  >
+                    <option value="">Seleccionar Bioma...</option>
+                    {renderOpcionesTemas()}
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Etiqueta / Categoría (opcional):</label>
                   <input type="text" className="input-pro" placeholder="Ej: Laboratorio 1" value={tareaCategoriaLibre} onChange={(e) => setTareaCategoriaLibre(e.target.value)} />
                 </div>
                 <div className="input-group">
@@ -1197,6 +1311,9 @@ export default function PanelProfesor() {
             <div className="card-pro">
               <h3 className="section-title section-title--gold">
                 📋 MISIONES ACTIVAS ({tareas.length})
+                {entregasPorCalificar > 0 && (
+                  <span className="text-xp"> · {entregasPorCalificar} por calificar</span>
+                )}
               </h3>
               {tareas.length === 0 && (
                 <p className="rpg-empty">Sin misiones publicadas. Crea la primera con el formulario.</p>
@@ -1216,6 +1333,9 @@ export default function PanelProfesor() {
                   )}
                   <div className="quest-card__footer">
                     <span className="text-xp">{tar.total_entregas || 0} entregas</span>
+                    {Number(tar.entregas_pendientes) > 0 && (
+                      <span className="badge badge--gold">{tar.entregas_pendientes} por calificar</span>
+                    )}
                     <button onClick={() => verEntregasDeTarea(tar)} className="btn-pro btn-pro-primary btn-sm">
                       Revisar Entregas
                     </button>
@@ -1270,52 +1390,317 @@ export default function PanelProfesor() {
       )}
 
       {/* =====================================================================
-          PESTAÑA 6: CRÓNICAS (CALIFICACIONES CSV)
+          PESTAÑA 6: LIBRO DE NOTAS Y CRÓNICAS
          ===================================================================== */}
       {pestana === 'calificaciones' && (
-        <div className="card-pro">
-          <div className="card-head-row">
-            <h3 className="section-title section-title--gold">
-              🏆 CRÓNICAS DE COMBATE Y AUDITORÍA DE XP
-            </h3>
-            <button onClick={exportarCalificacionesCSV} className="btn-pro btn-pro-primary">
-              <Download size={16} /> Descargar Reporte Excel (CSV)
-            </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="card-pro">
+            <div className="card-head-row">
+              <div className="card-head-row__intro">
+                <h3 className="section-title section-title--gold">
+                  📚 LIBRO DE NOTAS DEL GREMIO
+                </h3>
+                <p className="section-sub" style={{ marginTop: '0.25rem', marginBottom: 0 }}>
+                  Nota consolidada de la materia (0–{NOTA_MAX} pts) sumando Jefes Finales y Misiones calificadas.
+                </p>
+              </div>
+              <div className="book-actions">
+                <select
+                  className="input-pro"
+                  value={filtroUnidadLibro}
+                  onChange={(e) => setFiltroUnidadLibro(e.target.value)}
+                  aria-label="Filtrar el libro por ciudadela"
+                >
+                  <option value="">Todas las ciudadelas</option>
+                  {unidades.map(u => (
+                    <option key={u.id} value={u.id}>Unidad {u.numero} · {u.nombre}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={vistaNotas === 'libro' ? exportarLibroNotasCSV : exportarCalificacionesCSV}
+                  className="btn-pro btn-pro-primary"
+                >
+                  <Download size={16} />
+                  {vistaNotas === 'libro' ? ' Exportar libro (CSV)' : ' Exportar crónicas (CSV)'}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              <button
+                type="button"
+                className={`rpg-chip ${vistaNotas === 'libro' ? 'is-active' : ''}`}
+                onClick={() => setVistaNotas('libro')}
+              >
+                📚 Libro de notas
+              </button>
+              <button
+                type="button"
+                className={`rpg-chip ${vistaNotas === 'cronicas' ? 'is-active' : ''}`}
+                onClick={() => setVistaNotas('cronicas')}
+              >
+                📜 Crónicas de combate
+              </button>
+            </div>
+
+            {vistaNotas === 'libro' && (
+              <>
+                {!libroNotas ? (
+                  <p className="rpg-empty">Cargando libro de notas...</p>
+                ) : (
+                  <>
+                    <div className="book-summary">
+                      <div className="book-summary__item">
+                        <span className="book-summary__value">{libroNotas.resumen.total_estudiantes}</span>
+                        <span className="book-summary__label">Héroes</span>
+                      </div>
+                      <div className="book-summary__item">
+                        <span className="book-summary__value">{libroNotas.resumen.estudiantes_con_nota}</span>
+                        <span className="book-summary__label">Con nota</span>
+                      </div>
+                      <div className="book-summary__item">
+                        <span className="book-summary__value">{libroNotas.resumen.promedio_curso} / {libroNotas.nota_max}</span>
+                        <span className="book-summary__label">Promedio del curso</span>
+                      </div>
+                      <div className="book-summary__item">
+                        <span className="book-summary__value">{libroNotas.resumen.total_actividades}</span>
+                        <span className="book-summary__label">Actividades</span>
+                      </div>
+                      <div className={`book-summary__item ${libroNotas.resumen.entregas_sin_calificar > 0 ? 'book-summary__item--alert' : ''}`}>
+                        <span className="book-summary__value">{libroNotas.resumen.entregas_sin_calificar}</span>
+                        <span className="book-summary__label">Entregas por calificar</span>
+                      </div>
+                    </div>
+
+                    {libroNotas.estudiantes.length === 0 ? (
+                      <p className="rpg-empty">El gremio está vacío. Matricula héroes para comenzar el libro de notas.</p>
+                    ) : actividadesLibro.length === 0 ? (
+                      <p className="rpg-empty">No hay Jefes ni Misiones con puntos para la ciudadela seleccionada.</p>
+                    ) : (
+                      <>
+                        <div className="rpg-table-wrap">
+                          <table className="gradebook">
+                            <thead>
+                              <tr>
+                                <th className="gradebook__student">Héroe</th>
+                                {actividadesLibro.map(actividad => (
+                                  <th
+                                    key={actividad.clave}
+                                    className="gradebook__activity-head"
+                                    title={`${actividad.tema_titulo} · ${actividad.unidad_nombre || 'Sin unidad'}`}
+                                  >
+                                    <span className="gradebook__activity-type">{actividad.tipo === 'examen' ? '⚔️' : '🎒'}</span>
+                                    <span className="gradebook__activity-title">{actividad.titulo}</span>
+                                    <span className="gradebook__activity-pts">{actividad.puntos_max} pts</span>
+                                  </th>
+                                ))}
+                                <th className="gradebook__total-head">Nota</th>
+                                <th className="gradebook__pending-head">Pend.</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {libroNotas.estudiantes.map(estudiante => {
+                                const pendientesMostrados = actividadesLibro.filter(
+                                  (actividad) => !estudiante.actividades[actividad.clave]?.calificado
+                                ).length;
+                                return (
+                                  <tr key={estudiante.id} className={estudianteBoleta?.id === estudiante.id ? 'is-selected' : ''}>
+                                    <td className="gradebook__student">
+                                      <button
+                                        type="button"
+                                        className="gradebook__name"
+                                        onClick={() => verBoletaEstudiante(estudiante)}
+                                        title="Abrir boleta académica"
+                                      >
+                                        {estudiante.nombre}
+                                      </button>
+                                      <span className="roster-meta">
+                                        {estudiante.codigo_unico} · Nvl {estudiante.nivel || 1} · {estudiante.xp || 0} XP
+                                      </span>
+                                    </td>
+                                    {actividadesLibro.map(actividad => {
+                                      const celda = estudiante.actividades[actividad.clave];
+                                      const estado = celda?.calificado ? 'calificada' : celda?.entregada ? 'entregada' : 'pendiente';
+                                      return (
+                                        <td key={actividad.clave} className={`gradebook__cell gradebook__cell--${estado}`}>
+                                          {celda?.calificado
+                                            ? `${celda.puntos_ganados}/${actividad.puntos_max}`
+                                            : celda?.entregada ? 'Sin calificar' : '—'}
+                                        </td>
+                                      );
+                                    })}
+                                    <td className={`gradebook__total ${estudiante.nota_materia >= 60 ? 'is-pass' : 'is-fail'}`}>
+                                      {estudiante.nota_materia}/{libroNotas.nota_max}
+                                    </td>
+                                    <td className="gradebook__pending">{pendientesMostrados}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="section-sub" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                          💡 Haz clic en el nombre de un héroe para abrir su ficha académica. El filtro por ciudadela solo
+                          afecta las columnas visibles; la nota final siempre se calcula sobre {libroNotas.nota_max} puntos.
+                        </p>
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {vistaNotas === 'cronicas' && (
+              <div className="rpg-table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Aventurero</th>
+                      <th>Token</th>
+                      <th>Jefe Enfrentado</th>
+                      <th>Aciertos</th>
+                      <th>Puntaje</th>
+                      <th>Puntos</th>
+                      <th>XP Ganada</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {calificaciones.map(c => (
+                      <tr key={c.id}>
+                        <td className="text-strong is-strong">{c.estudiante_nombre}</td>
+                        <td className="cell-token">{c.codigo_unico}</td>
+                        <td>{c.evaluacion_titulo}</td>
+                        <td>{c.aciertos}/{c.total_preguntas}</td>
+                        <td className="is-strong">{c.puntaje}%</td>
+                        <td className="text-xp is-strong">{c.puntos_ganados ?? 0}/{c.puntos_max ?? '—'} pts</td>
+                        <td className="text-xp is-strong">+{c.xp_ganada || c.puntaje * 3} XP</td>
+                        <td>
+                          <span className={`badge ${c.puntaje >= 60 ? 'badge-success' : 'badge-danger'}`}>
+                            {c.puntaje >= 60 ? 'Jefe Derrotado' : 'Derrotado'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-          <div className="rpg-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Aventurero</th>
-                  <th>Token</th>
-                  <th>Jefe Enfrentado</th>
-                  <th>Aciertos</th>
-                  <th>Puntaje</th>
-                  <th>Puntos</th>
-                  <th>XP Ganada</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {calificaciones.map(c => (
-                  <tr key={c.id}>
-                    <td className="text-strong is-strong">{c.estudiante_nombre}</td>
-                    <td className="cell-token">{c.codigo_unico}</td>
-                    <td>{c.evaluacion_titulo}</td>
-                    <td>{c.aciertos}/{c.total_preguntas}</td>
-                    <td className="is-strong">{c.puntaje}%</td>
-                    <td className="text-xp is-strong">{c.puntos_ganados ?? 0}/{c.puntos_max ?? '—'} pts</td>
-                    <td className="text-xp is-strong">+{c.xp_ganada || c.puntaje * 3} XP</td>
-                    <td>
-                      <span className={`badge ${c.puntaje >= 60 ? 'badge-success' : 'badge-danger'}`}>
-                        {c.puntaje >= 60 ? 'Jefe Derrotado' : 'Derrotado'}
+
+          {estudianteBoleta && (
+            <div className="card-pro card-pro--gold">
+              <div className="card-head-row">
+                <div>
+                  <h3 className="section-title section-title--gold">
+                    🎓 FICHA ACADÉMICA · {estudianteBoleta.nombre}
+                  </h3>
+                  <p className="section-sub" style={{ marginTop: '0.25rem', marginBottom: 0 }}>
+                    {estudianteBoleta.codigo_unico} · Nivel {estudianteBoleta.nivel || 1} · {estudianteBoleta.xp || 0} XP
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-pro btn-pro--outline"
+                  onClick={() => { setEstudianteBoleta(null); setBoletaDocente(null); }}
+                >
+                  Cerrar ficha
+                </button>
+              </div>
+
+              {cargandoBoleta ? (
+                <p className="rpg-empty">Cargando boleta académica...</p>
+              ) : !boletaDocente ? (
+                <p className="rpg-empty">No se pudo cargar la boleta de este héroe.</p>
+              ) : (
+                <>
+                  <div className="achievement-row" style={{ alignItems: 'flex-start' }}>
+                    <div>
+                      <strong className="achievement-row__title">NOTA ACTUAL</strong>
+                      <span className="achievement-row__meta">
+                        {boletaDocente.puntos_ganados} de {boletaDocente.nota_max} pts ganados · {boletaDocente.puntos_restantes_materia} por ganar
                       </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                    <span className={`achievement-score ${boletaDocente.nota_materia >= 60 ? 'is-pass' : 'is-fail'}`}>
+                      {boletaDocente.nota_materia} / {boletaDocente.nota_max}
+                    </span>
+                  </div>
+                  <StatBar
+                    label={`★ NOTA DE LA MATERIA (${boletaDocente.puntos_ganados} / ${boletaDocente.nota_max} PTS)`}
+                    value={boletaDocente.nota_materia}
+                    max={boletaDocente.nota_max}
+                    color="xp"
+                    suffix=" pts"
+                    showPercent={false}
+                  />
+
+                  <h4 className="zone-column__title">📜 ACTIVIDADES CALIFICADAS ({boletaDocente.rendimiento.length})</h4>
+                  {boletaDocente.rendimiento.length === 0 ? (
+                    <p className="rpg-empty">Este héroe aún no tiene actividades calificadas.</p>
+                  ) : (
+                    <div className="rpg-table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Actividad</th>
+                            <th>Tipo</th>
+                            <th>Tema</th>
+                            <th>Puntos</th>
+                            <th>Desempeño</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {boletaDocente.rendimiento.map((r) => (
+                            <tr key={`${r.tipo}-${r.registro_id}`}>
+                              <td className="text-strong">{r.actividad}</td>
+                              <td>{r.tipo === 'examen' ? '⚔️ Examen' : '🎒 Misión'}</td>
+                              <td className="text-student">{r.tema_titulo}</td>
+                              <td className="text-xp is-strong">{r.puntos_ganados} / {r.puntos_max} pts</td>
+                              <td>
+                                <span className={r.porcentaje >= 60 ? 'badge badge-success' : 'badge badge-danger'}>
+                                  {r.porcentaje}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <h4 className="zone-column__title" style={{ marginTop: '1rem' }}>
+                    ⏳ PUNTOS PENDIENTES ({boletaDocente.pendientes.length})
+                  </h4>
+                  {boletaDocente.pendientes.length === 0 ? (
+                    <p className="rpg-empty">¡Este héroe completó todas las actividades de la materia!</p>
+                  ) : (
+                    <div className="rpg-table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Actividad pendiente</th>
+                            <th>Tipo</th>
+                            <th>Tema</th>
+                            <th>Puntos en juego</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {boletaDocente.pendientes.map((p) => (
+                            <tr key={`${p.tipo}-${p.actividad_id}`}>
+                              <td className="text-strong">{p.actividad}</td>
+                              <td>{p.tipo === 'examen' ? '⚔️ Examen' : '🎒 Misión'}</td>
+                              <td>{p.tema_titulo}</td>
+                              <td className="text-xp is-strong">{p.puntos_max} pts</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
