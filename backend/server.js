@@ -782,6 +782,140 @@ app.get('/api/calificaciones/estudiante/:id', (req, res) => {
   res.json(notas);
 });
 
+// 📚 LIBRO DE NOTAS DEL DOCENTE: matriz de estudiantes × actividades de la materia.
+// Devuelve la nota consolidada (0-100), el detalle por actividad y las entregas sin calificar.
+app.get('/api/libro-notas', (_req, res) => {
+  const estudiantes = db.prepare(`
+    SELECT id, nombre, codigo_unico, xp, nivel, clase_rpg
+    FROM estudiantes
+    ORDER BY nombre COLLATE NOCASE ASC, id ASC
+  `).all();
+
+  // Jefes y misiones en una sola lista ordenada por ciudadela, tema y tipo de actividad.
+  const actividades = db.prepare(`
+    SELECT * FROM (
+      SELECT 'examen' AS tipo, ev.id AS id, ev.titulo AS titulo, ev.puntos_max AS puntos_max,
+             ev.tema_id AS tema_id, t.titulo AS tema_titulo, t.unidad_id AS unidad_id,
+             t.orden AS tema_orden, u.numero AS unidad_numero, u.nombre AS unidad_nombre,
+             u.orden AS unidad_orden, 0 AS tipo_orden
+      FROM evaluaciones ev
+      JOIN temas t ON ev.tema_id = t.id
+      LEFT JOIN unidades u ON t.unidad_id = u.id
+      UNION ALL
+      SELECT 'tarea' AS tipo, ta.id AS id, ta.titulo AS titulo, ta.puntos_max AS puntos_max,
+             ta.tema_id AS tema_id, t.titulo AS tema_titulo, t.unidad_id AS unidad_id,
+             t.orden AS tema_orden, u.numero AS unidad_numero, u.nombre AS unidad_nombre,
+             u.orden AS unidad_orden, 1 AS tipo_orden
+      FROM tareas ta
+      JOIN temas t ON ta.tema_id = t.id
+      LEFT JOIN unidades u ON t.unidad_id = u.id
+    ) AS actividades_union
+    ORDER BY COALESCE(unidad_orden, 9999), COALESCE(unidad_numero, 9999),
+             COALESCE(tema_orden, 9999), tipo_orden, id
+  `).all().map((actividad) => ({
+    clave: `${actividad.tipo}:${actividad.id}`,
+    tipo: actividad.tipo,
+    id: actividad.id,
+    titulo: actividad.titulo,
+    tema_id: actividad.tema_id,
+    tema_titulo: actividad.tema_titulo,
+    unidad_id: actividad.unidad_id,
+    unidad_numero: actividad.unidad_numero,
+    unidad_nombre: actividad.unidad_nombre,
+    puntos_max: Number(actividad.puntos_max) || 0
+  }));
+
+  // Una sola lectura por tabla; el cruce se hace en memoria para evitar N+1.
+  const notasExamen = new Map();
+  db.prepare(`
+    SELECT estudiante_id, evaluacion_id, puntaje, fecha
+    FROM calificaciones
+    ORDER BY id ASC
+  `).all().forEach((nota) => {
+    notasExamen.set(`${nota.estudiante_id}:${nota.evaluacion_id}`, nota);
+  });
+
+  const entregasTarea = new Map();
+  db.prepare(`
+    SELECT estudiante_id, tarea_id, calificacion, fecha
+    FROM entregas
+    ORDER BY id ASC
+  `).all().forEach((entrega) => {
+    entregasTarea.set(`${entrega.estudiante_id}:${entrega.tarea_id}`, entrega);
+  });
+
+  const estudiantesLibro = estudiantes.map((estudiante) => {
+    const celdas = {};
+    let puntosGanados = 0;
+    let actividadesCalificadas = 0;
+    let actividadesPendientes = 0;
+    let entregasSinCalificar = 0;
+
+    actividades.forEach((actividad) => {
+      if (actividad.tipo === 'examen') {
+        const nota = notasExamen.get(`${estudiante.id}:${actividad.id}`);
+        if (!nota) {
+          actividadesPendientes += 1;
+          celdas[actividad.clave] = { calificado: false, entregada: false, porcentaje: null, puntos_ganados: 0, fecha: null };
+          return;
+        }
+
+        const porcentaje = Math.min(NOTA_MAX, Math.max(0, Number(nota.puntaje) || 0));
+        const puntos = Math.round((porcentaje / NOTA_MAX) * actividad.puntos_max);
+        puntosGanados += puntos;
+        actividadesCalificadas += 1;
+        celdas[actividad.clave] = { calificado: true, entregada: true, porcentaje, puntos_ganados: puntos, fecha: nota.fecha };
+        return;
+      }
+
+      const entrega = entregasTarea.get(`${estudiante.id}:${actividad.id}`);
+      if (entrega?.calificacion != null) {
+        const porcentaje = Math.min(NOTA_MAX, Math.max(0, Number(entrega.calificacion) || 0));
+        const puntos = Math.round((porcentaje / NOTA_MAX) * actividad.puntos_max);
+        puntosGanados += puntos;
+        actividadesCalificadas += 1;
+        celdas[actividad.clave] = { calificado: true, entregada: true, porcentaje, puntos_ganados: puntos, fecha: entrega.fecha };
+        return;
+      }
+
+      actividadesPendientes += 1;
+      if (entrega) entregasSinCalificar += 1;
+      celdas[actividad.clave] = { calificado: false, entregada: Boolean(entrega), porcentaje: null, puntos_ganados: 0, fecha: entrega?.fecha || null };
+    });
+
+    const notaMateria = Math.min(NOTA_MAX, Math.round(puntosGanados));
+    return {
+      ...estudiante,
+      nota_materia: notaMateria,
+      puntos_ganados: notaMateria,
+      puntos_restantes_materia: Math.max(0, NOTA_MAX - notaMateria),
+      actividades_calificadas: actividadesCalificadas,
+      actividades_pendientes: actividadesPendientes,
+      entregas_sin_calificar: entregasSinCalificar,
+      actividades: celdas
+    };
+  });
+
+  const conNota = estudiantesLibro.filter((estudiante) => estudiante.actividades_calificadas > 0);
+  const promedioCurso = conNota.length
+    ? Math.round(conNota.reduce((total, estudiante) => total + estudiante.nota_materia, 0) / conNota.length)
+    : 0;
+
+  res.json({
+    nota_max: NOTA_MAX,
+    puntos_asignados: puntosAsignadosTotales(),
+    actividades,
+    estudiantes: estudiantesLibro,
+    resumen: {
+      total_estudiantes: estudiantesLibro.length,
+      estudiantes_con_nota: conNota.length,
+      promedio_curso: promedioCurso,
+      total_actividades: actividades.length,
+      entregas_sin_calificar: estudiantesLibro.reduce((total, estudiante) => total + estudiante.entregas_sin_calificar, 0)
+    }
+  });
+});
+
 // --- 6. TRABAJOS PRÁCTICOS / MISIONES DE LABORATORIO ---
 
 // 💡 MIGRACIÓN AUTOMÁTICA: Añadir columna para archivos adjuntos sin romper datos
@@ -794,7 +928,8 @@ try {
 app.get('/api/tareas', (req, res) => {
   const query = `
     SELECT t.*, te.titulo as tema_titulo, te.bioma as tema_bioma,
-           (SELECT COUNT(*) FROM entregas WHERE tarea_id = t.id) as total_entregas
+           (SELECT COUNT(*) FROM entregas WHERE tarea_id = t.id) as total_entregas,
+           (SELECT COUNT(*) FROM entregas WHERE tarea_id = t.id AND calificacion IS NULL) as entregas_pendientes
     FROM tareas t
     JOIN temas te ON t.tema_id = te.id
     ORDER BY t.id DESC
@@ -807,6 +942,10 @@ app.post('/api/tareas', (req, res) => {
   const { tema_id, titulo, descripcion, fecha_limite, archivo_adjunto, puntos_max } = req.body;
   if (!tema_id || !titulo?.trim() || !descripcion?.trim()) {
     return res.status(400).json({ error: 'Tema, título y descripción son obligatorios.' });
+  }
+  const tema = db.prepare('SELECT id FROM temas WHERE id = ?').get(tema_id);
+  if (!tema) {
+    return res.status(400).json({ error: 'El Bioma indicado no existe. Selecciona uno válido.' });
   }
 
   // 📚 Validación de puntos académicos: entero ≥ 1 y sin pasarse de los 100 de la materia
