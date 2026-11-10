@@ -729,13 +729,159 @@ app.delete('/api/preguntas/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// --- COMBATE ARCANO: RESPUESTAS INMEDIATAS Y BLOQUEO SERVER-SIDE ---
+// Devuelve el estado del intento: si ya fue calificado, las respuestas
+// bloqueadas y el tiempo transcurrido desde el primer conjuro.
+app.get('/api/evaluaciones/:id/intento/:estudianteId', (req, res) => {
+  const evaluacionId = Number(req.params.id);
+  const estudianteId = Number(req.params.estudianteId);
+
+  if (!Number.isFinite(evaluacionId) || !Number.isFinite(estudianteId)) {
+    return res.status(400).json({ error: 'Intento de combate inválido.' });
+  }
+
+  const evaluacion = db.prepare('SELECT * FROM evaluaciones WHERE id = ?').get(evaluacionId);
+  if (!evaluacion) {
+    return res.status(404).json({ error: 'El Jefe Final no existe.' });
+  }
+
+  const calificacion = db.prepare(
+    'SELECT * FROM calificaciones WHERE estudiante_id = ? AND evaluacion_id = ?'
+  ).get(estudianteId, evaluacionId);
+
+  const respuestas = db.prepare(`
+    SELECT r.pregunta_id, r.opcion, r.es_correcta, r.fecha,
+           p.opcion_correcta, p.explicacion
+    FROM respuestas_intento r
+    JOIN preguntas p ON p.id = r.pregunta_id
+    WHERE r.estudiante_id = ? AND r.evaluacion_id = ?
+    ORDER BY r.fecha ASC, r.id ASC
+  `).all(estudianteId, evaluacionId);
+
+  const tiempo = db.prepare(`
+    SELECT CAST((julianday('now') - julianday(MIN(fecha))) * 86400 AS INTEGER) AS segundos
+    FROM respuestas_intento
+    WHERE estudiante_id = ? AND evaluacion_id = ?
+  `).get(estudianteId, evaluacionId);
+
+  let desglose = [];
+  if (calificacion) {
+    try {
+      desglose = JSON.parse(calificacion.detalle_respuestas || '[]');
+    } catch {
+      desglose = [];
+    }
+  }
+
+  res.json({
+    finalizada: Boolean(calificacion),
+    transcurrido_segundos: Math.max(0, Number(tiempo?.segundos) || 0),
+    respuestas: respuestas.map((r) => ({
+      pregunta_id: r.pregunta_id,
+      opcion: r.opcion,
+      correcta: Boolean(r.es_correcta),
+      opcion_correcta: r.opcion_correcta,
+      explicacion: r.explicacion,
+      fecha: r.fecha
+    })),
+    calificacion: calificacion ? {
+      id: calificacion.id,
+      puntaje: calificacion.puntaje,
+      aciertos: calificacion.aciertos,
+      total_preguntas: calificacion.total_preguntas,
+      xp_ganada: calificacion.xp_ganada,
+      retroalimentacion: calificacion.retroalimentacion,
+      desglose,
+      puntos_max: Number(evaluacion.puntos_max) || 0,
+      puntos_ganados: puntosGanadosActividad(calificacion.puntaje, evaluacion.puntos_max)
+    } : null
+  });
+});
+
+// Registra un conjuro y devuelve el veredicto inmediato. La primera respuesta
+// queda bloqueada: repetir la llamada devuelve el mismo resultado.
+app.post('/api/evaluaciones/:id/responder', (req, res) => {
+  const evaluacionId = Number(req.params.id);
+  const { estudiante_id, pregunta_id, opcion } = req.body;
+  const estudianteId = Number(estudiante_id);
+  const preguntaId = Number(pregunta_id);
+  const marcada = String(opcion || '').trim().toUpperCase();
+
+  if (!Number.isFinite(evaluacionId) || !Number.isFinite(estudianteId) || !Number.isFinite(preguntaId)) {
+    return res.status(400).json({ error: 'Datos incompletos para lanzar el conjuro.' });
+  }
+  if (!['A', 'B', 'C', 'D'].includes(marcada)) {
+    return res.status(400).json({ error: 'Debes elegir una opción válida (A, B, C o D).' });
+  }
+
+  const estudiante = db.prepare('SELECT id FROM estudiantes WHERE id = ?').get(estudianteId);
+  if (!estudiante) {
+    return res.status(404).json({ error: 'El héroe no existe.' });
+  }
+
+  const intentoPrevio = db.prepare(
+    'SELECT id, puntaje FROM calificaciones WHERE estudiante_id = ? AND evaluacion_id = ?'
+  ).get(estudianteId, evaluacionId);
+  if (intentoPrevio) {
+    return res.status(400).json({
+      error: `Ya te enfrentaste a este Jefe previamente obteniendo ${intentoPrevio.puntaje}%. Solo se permite un intento por mazmorra.`
+    });
+  }
+
+  const pregunta = db.prepare(`
+    SELECT p.id, p.opcion_correcta, p.explicacion, p.evaluacion_id, t.titulo AS tema_titulo
+    FROM preguntas p
+    JOIN evaluaciones e ON e.id = p.evaluacion_id
+    JOIN temas t ON t.id = e.tema_id
+    WHERE p.id = ? AND p.evaluacion_id = ?
+  `).get(preguntaId, evaluacionId);
+  if (!pregunta) {
+    return res.status(404).json({ error: 'El conjuro no pertenece a este Jefe Final.' });
+  }
+
+  const correcta = String(pregunta.opcion_correcta || '').trim().toUpperCase();
+  const esCorrecta = marcada === correcta;
+
+  const info = db.prepare(`
+    INSERT OR IGNORE INTO respuestas_intento
+      (estudiante_id, evaluacion_id, pregunta_id, opcion, es_correcta)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(estudianteId, evaluacionId, preguntaId, marcada, esCorrecta ? 1 : 0);
+
+  const guardada = db.prepare(`
+    SELECT opcion, es_correcta
+    FROM respuestas_intento
+    WHERE estudiante_id = ? AND evaluacion_id = ? AND pregunta_id = ?
+  `).get(estudianteId, evaluacionId, preguntaId);
+
+  res.json({
+    pregunta_id: preguntaId,
+    opcion: guardada?.opcion ?? marcada,
+    correcta: Boolean(guardada?.es_correcta),
+    opcion_correcta: correcta,
+    explicacion: pregunta.explicacion || `La respuesta correcta era la opción ${correcta}.`,
+    tema_titulo: pregunta.tema_titulo,
+    ya_respondida: info.changes === 0
+  });
+});
+
 // --- MOTOR DE CORRECCIÓN RPG: REGISTRO DE RESPUESTAS, XP Y NIVEL (Req. 12, 13, 14 y 15) ---
 app.post('/api/evaluaciones/:id/calificar', (req, res) => {
   const evaluacionId = req.params.id;
   const { estudiante_id, respuestas } = req.body;
 
-  if (!estudiante_id || !respuestas) {
+  if (!estudiante_id || !respuestas || typeof respuestas !== 'object' || Array.isArray(respuestas)) {
     return res.status(400).json({ error: 'Datos incompletos para calificar el enfrentamiento' });
+  }
+
+  // 🔒 Las respuestas ya lanzadas en el combate son definitivas. El servidor
+  // las guardó en respuestas_intento y aquí tienen prioridad sobre el cliente.
+  const respuestasFinales = { ...respuestas };
+  const respuestasBloqueadas = db.prepare(
+    'SELECT pregunta_id, opcion FROM respuestas_intento WHERE estudiante_id = ? AND evaluacion_id = ?'
+  ).all(estudiante_id, evaluacionId);
+  for (const bloqueada of respuestasBloqueadas) {
+    respuestasFinales[bloqueada.pregunta_id] = bloqueada.opcion;
   }
 
   const intentoPrevio = db.prepare('SELECT id, puntaje FROM calificaciones WHERE estudiante_id = ? AND evaluacion_id = ?').get(estudiante_id, evaluacionId);
@@ -755,7 +901,7 @@ app.post('/api/evaluaciones/:id/calificar', (req, res) => {
   const desglose = [];
 
   preguntas.forEach((p) => {
-    const marcada = respuestas[p.id] ? respuestas[p.id].toUpperCase() : 'SIN RESPONDER';
+    const marcada = respuestasFinales[p.id] ? respuestasFinales[p.id].toUpperCase() : 'SIN RESPONDER';
     const correcta = p.opcion_correcta.toUpperCase();
     const esCorrecta = marcada === correcta;
     if (esCorrecta) aciertos++;

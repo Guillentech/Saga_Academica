@@ -158,6 +158,26 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_practicas_estudiante_fecha
     ON practicas(estudiante_id, fecha);
+
+  -- ⚔️ Respuestas bloqueadas del combate de evaluación.
+  -- La primera opción lanzada por pregunta es definitiva y se guarda aquí;
+  -- el endpoint de calificación usa estas respuestas, no las del cliente.
+  CREATE TABLE IF NOT EXISTS respuestas_intento (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    estudiante_id INTEGER NOT NULL,
+    evaluacion_id INTEGER NOT NULL,
+    pregunta_id INTEGER NOT NULL,
+    opcion TEXT NOT NULL,
+    es_correcta INTEGER NOT NULL DEFAULT 0,
+    fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (estudiante_id, evaluacion_id, pregunta_id),
+    FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id) ON DELETE CASCADE,
+    FOREIGN KEY (evaluacion_id) REFERENCES evaluaciones(id) ON DELETE CASCADE,
+    FOREIGN KEY (pregunta_id) REFERENCES preguntas(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_respuestas_intento_estudiante
+    ON respuestas_intento(estudiante_id, evaluacion_id);
 `);
 
 // 2. Migraciones automáticas seguras para agregar columnas RPG sin perder datos existentes
