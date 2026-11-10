@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { API_URL } from '../config';
+import { API_URL, urlArchivo } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Send } from 'lucide-react';
+import { FileText, Send } from 'lucide-react';
 import { StatBar, GameHud, GameHotbar, PageBackdrop, MarkdownLite } from '../components/rpg';
 import PerfilEstudiante from '../components/perfil/PerfilEstudiante';
 import MapaGeneral from '../components/mapa/MapaGeneral';
 import MapaUnidad from '../components/mapa/MapaUnidad';
+import ModalEntrega from '../components/mapa/ModalEntrega';
 import ModalTema from '../components/mapa/ModalTema';
 import CampoEntrenamiento from '../components/entrenamiento/CampoEntrenamiento';
 import { AlchemistWizard16Bit } from '../components/mapa/Sprites';
@@ -69,8 +70,8 @@ export default function PanelEstudiante() {
   const [unidadActiva, setUnidadActiva] = useState(null);
 
   // 💡 Estados de Entregas de Misiones (Trabajos Prácticos)
-  const [entregaTexto, setEntregaTexto] = useState({});
-  const [enviandoTarea, setEnviandoTarea] = useState(false);
+  const [tareaEnEntrega, setTareaEnEntrega] = useState(null);
+  const [avisoEntrega, setAvisoEntrega] = useState('');
 
   // 💡 Estados del Sabio Alquimista (Copiloto IA Estudiantil)
   const [dialogoAlquimistaAbierto, setDialogoAlquimistaAbierto] = useState(false);
@@ -111,13 +112,9 @@ export default function PanelEstudiante() {
         .catch(() => setBoleta(null));
 
       fetch(`${API_URL}/api/entregas/estudiante/${user.id}`)
-        .then(r => r.json())
-        .then(data => {
-          setMisEntregas(data);
-          const mapa = {};
-          data.forEach(e => { mapa[e.tarea_id] = e.contenido; });
-          setEntregaTexto(prev => ({ ...mapa, ...prev }));
-        });
+        .then(r => (r.ok ? r.json() : []))
+        .then(setMisEntregas)
+        .catch(() => setMisEntregas([]));
     }
   };
 
@@ -126,6 +123,13 @@ export default function PanelEstudiante() {
     // cargarDatos se recrea en cada render; solo dependemos del usuario autenticado.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // ✅ El aviso de entrega exitosa se oculta solo para no dejar ruido en el inventario.
+  useEffect(() => {
+    if (!avisoEntrega) return undefined;
+    const temporizador = setTimeout(() => setAvisoEntrega(''), 6000);
+    return () => clearTimeout(temporizador);
+  }, [avisoEntrega]);
 
   // ==========================================================================
   // 💡 CÁLCULO DE ESCALA ENTERA (1x, 2x, 3x...) PARA EVITAR PÍXELES BORROSOS
@@ -301,34 +305,6 @@ export default function PanelEstudiante() {
     });
   };
 
-// 💡 FUNCIÓN: Enviar un Trabajo Práctico al Servidor
-  const enviarTrabajo = async (tareaId) => {
-    const contenido = entregaTexto[tareaId];
-    if (!contenido?.trim()) return alert('Redacta el pergamino de tu entrega antes de enviarlo.');
-
-    setEnviandoTarea(true);
-    try {
-      const res = await fetch(`${API_URL}/api/entregas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tarea_id: tareaId,
-          estudiante_id: user.id,
-          contenido: contenido.trim()
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        alert(data.mensaje || '¡Misión entregada con éxito!');
-        cargarDatos();
-      }
-    } catch {
-      alert('Error al enviar la misión.');
-    } finally {
-      setEnviandoTarea(false);
-    }
-  };
-
   // 💡 FUNCIÓN: Consultar al Bot AI del Sabio Alquimista
   const consultarSabioAlquimista = async (e) => {
     e.preventDefault();
@@ -370,7 +346,7 @@ export default function PanelEstudiante() {
   const estadoHeroe = energiaActual <= 35 ? 'energia-baja' : (hayTormenta ? 'combate' : 'normal');
 
   return (
-    <div className="panel-page panel-page--student">
+    <div className={`panel-page panel-page--student ${vistaHotbar === 'mapa' ? 'mapa-activa' : ''}`}>
       <PageBackdrop variant="student" />
       <div className="container page-shell" style={{ maxWidth: '1220px' }}>
       
@@ -520,6 +496,10 @@ export default function PanelEstudiante() {
             </button>
           </div>
 
+          {avisoEntrega && (
+            <p className="perfil-mensaje is-success" role="status">✅ {avisoEntrega}</p>
+          )}
+
           {tareasFiltradas.length === 0 && (
             <p className="rpg-empty">No hay misiones con este filtro.</p>
           )}
@@ -529,7 +509,7 @@ export default function PanelEstudiante() {
             return (
               <div
                 key={tar.id}
-                className={`quest-card quest-card--compact ${expandida ? '' : ''}`}
+                className={`quest-card ${expandida ? '' : 'quest-card--compact'}`}
                 onClick={() => setQuestCardExpandida(prev => ({ ...prev, [tar.id]: !expandida }))}
                 role="button"
                 tabIndex={0}
@@ -575,32 +555,79 @@ export default function PanelEstudiante() {
                         download={`Guia_Mision_${tar.titulo.replace(/\s+/g, '_')}`}
                         className="quest-file"
                         style={{ marginTop: '0.3rem' }}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         📄 Descargar Documento Adjunto
                       </a>
                     )}
 
-                    <textarea
-                      className="input-pro"
-                      rows="3"
-                      placeholder="Escribe aquí tu código o respuesta de la misión..."
-                      value={entregaTexto[tar.id] || ''}
-                      onChange={(e) => setEntregaTexto({ ...entregaTexto, [tar.id]: e.target.value })}
-                      style={{ marginTop: '0.5rem' }}
-                    />
+                    {entrega && (
+                      <div className="entrega-resumen">
+                        <div className="entrega-resumen__head">
+                          <span className="entrega-resumen__titulo">TU ENTREGA</span>
+                          {entrega.calificacion != null ? (
+                            <span className="badge badge-success">
+                              {entrega.calificacion}% · {entrega.puntos_ganados ?? '—'} pts
+                            </span>
+                          ) : (
+                            <span className="badge badge--gold">En revisión</span>
+                          )}
+                        </div>
+
+                        {entrega.contenido && (
+                          <p className="entrega-resumen__texto">{entrega.contenido}</p>
+                        )}
+
+                        {entrega.archivo_ruta && (
+                          <a
+                            href={urlArchivo(entrega.archivo_ruta)}
+                            download={entrega.archivo_nombre || `Entrega_${tar.titulo.replace(/\s+/g, '_')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="quest-file"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <FileText size={14} /> {entrega.archivo_nombre || 'Archivo enviado'}
+                          </a>
+                        )}
+
+                        {entrega.retroalimentacion && (
+                          <p className="entrega-feedback">
+                            <strong>Game Master:</strong> {entrega.retroalimentacion}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     <button
-                      onClick={() => enviarTrabajo(tar.id)}
-                      disabled={enviandoTarea}
-                      className="btn-pro btn-pro-primary btn-block"
-                      style={{ marginTop: '0.5rem' }}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTareaEnEntrega(tar);
+                      }}
+                      className="btn-pro btn-pro-primary btn-block quest-card__entrega"
                     >
-                      <Send size={15} /> {entrega ? 'Actualizar Misión' : 'Enviar Misión'}
+                      <FileText size={15} /> {entrega ? 'Revisar o actualizar entrega' : 'Adjuntar archivo y entregar'}
                     </button>
                   </>
                 )}
               </div>
             );
           })}
+
+          {tareaEnEntrega && (
+            <ModalEntrega
+              tarea={tareaEnEntrega}
+              entrega={misEntregas.find(e => e.tarea_id === tareaEnEntrega.id)}
+              estudianteId={user?.id}
+              onClose={() => setTareaEnEntrega(null)}
+              onEnviada={(mensaje) => {
+                setTareaEnEntrega(null);
+                setAvisoEntrega(mensaje || '¡Misión entregada con éxito!');
+                cargarDatos();
+              }}
+            />
+          )}
         </div>
       )}
 
