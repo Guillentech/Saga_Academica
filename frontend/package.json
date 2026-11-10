@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "test": "node --test",
     "preview": "vite preview",
-    "pwa:assets": "pwa-assets-generator --preset minimal public/favicon.svg",
+    "pwa:assets": "pwa-assets-generator --preset minimal public/icon-source.png",
     "audio:generate": "node scripts/generate-chiptune.mjs"
   },
   "dependencies": {
