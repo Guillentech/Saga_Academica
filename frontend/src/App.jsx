@@ -46,33 +46,54 @@ const HeaderGlobal = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const esMovil = useMediaQuery('(max-width: 639px)');
+  const esPantallaPequena = useMediaQuery('(max-width: 800px) and (max-height: 460px)');
+  const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
+  const menuRef = useRef(null);
 
-  // 📱 Ocultar el header al hacer scroll hacia abajo en móvil para liberar vista del body y el mapa 2D.
+  // El header permanece oculto durante el scroll y solo reaparece cuando la página
+  // está exactamente arriba del todo (scrollTop === 0).
   const [headerOculto, setHeaderOculto] = useState(false);
-  const ultimoScrollY = useRef(0);
 
   useEffect(() => {
-    if (!esMovil) {
-      setHeaderOculto(false);
-      return;
-    }
+    let framePendiente = null;
 
-    const manejarScroll = () => {
-      const y = window.scrollY;
-      const bajando = y > ultimoScrollY.current;
-
-      if (bajando && y > 40) {
-        setHeaderOculto(true);
-      } else if (!bajando || y === 0) {
-        setHeaderOculto(false);
-      }
-
-      ultimoScrollY.current = y;
+    const actualizarHeader = () => {
+      framePendiente = null;
+      const scrollTop = window.pageYOffset
+        || document.documentElement.scrollTop
+        || document.body.scrollTop
+        || 0;
+      setHeaderOculto(scrollTop > 0);
     };
 
+    const manejarScroll = () => {
+      if (framePendiente === null) {
+        framePendiente = window.requestAnimationFrame(actualizarHeader);
+      }
+    };
+
+    // Sincroniza el estado al montar y al cambiar de página.
+    actualizarHeader();
     window.addEventListener('scroll', manejarScroll, { passive: true });
-    return () => window.removeEventListener('scroll', manejarScroll);
-  }, [esMovil]);
+    window.addEventListener('resize', manejarScroll);
+
+    return () => {
+      if (framePendiente !== null) window.cancelAnimationFrame(framePendiente);
+      window.removeEventListener('scroll', manejarScroll);
+      window.removeEventListener('resize', manejarScroll);
+    };
+  }, [location.pathname]);
+
+  // Cerrar menú de usuario al hacer clic fuera
+  useEffect(() => {
+    const manejarClickFuera = (e) => {
+      if (menuUsuarioAbierto && menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuUsuarioAbierto(false);
+      }
+    };
+    document.addEventListener('mousedown', manejarClickFuera);
+    return () => document.removeEventListener('mousedown', manejarClickFuera);
+  }, [menuUsuarioAbierto]);
 
   const [theme, setTheme] = useState(() => localStorage.getItem('theme_lms') || 'dark');
   useEffect(() => {
@@ -183,11 +204,12 @@ const HeaderGlobal = () => {
   }
 
   return (
-    <header className={`header-pro ${headerOculto ? 'header-pro--oculto' : ''}`}>
+    <header className={`header-pro ${esPantallaPequena ? 'header-pro--compacto' : ''} ${headerOculto ? 'header-pro--oculto' : ''}`}>
       <div className="header-left">
         {!enInicio && (
           <BotonHud onClick={manejarRetroceso} tono="violeta" title="Regresar">
-            <ArrowLeft size={16} /><span>{obtenerTextoRetroceso()}</span>
+            <ArrowLeft size={14} />
+            {!esPantallaPequena && <span>{obtenerTextoRetroceso()}</span>}
           </BotonHud>
         )}
 
@@ -205,6 +227,7 @@ const HeaderGlobal = () => {
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>
         {user ? (
+          <>
           <div className="header-user">
             {enInicio && (
               <Link to={user.rol === 'profesor' ? '/panel-profesor' : '/panel-estudiante'} className="btn-guest btn-guest-student">
@@ -213,7 +236,7 @@ const HeaderGlobal = () => {
             )}
 
             {!esPanelEstudiante && (
-              <div className="user-profile-badge">
+              <div className="user-profile-badge" ref={menuRef} onClick={() => setMenuUsuarioAbierto(!menuUsuarioAbierto)}>
                 
                 {/* 💡 AQUÍ SE MUESTRA LA FOTO DE PERFIL EN TIEMPO REAL */}
                 <div className="avatar-circle">
@@ -226,19 +249,66 @@ const HeaderGlobal = () => {
                   )}
                 </div>
 
+                {!esPantallaPequena && (
                 <div className="user-info">
                   <span className="user-name">{user.nombre}</span>
                   <span className="user-role">
                     {user.rol === 'profesor' ? '🧙‍♂️ Game Master' : `🛡️ Nivel ${user.nivel || 1} • ${user.clase_rpg || 'Guerrero'}`}
                   </span>
                 </div>
+                )}
               </div>
             )}
 
             <BotonHud onClick={handleCerrarSesion} tono="rojo">
-              <LogOut size={15} /><span>Salir</span>
+              <LogOut size={13} />
+              {!esPantallaPequena && <span>Salir</span>}
             </BotonHud>
           </div>
+          {menuUsuarioAbierto && (
+            <div className="user-menu">
+              <button
+                type="button"
+                className="user-menu__item"
+                onClick={() => {
+                  setMenuUsuarioAbierto(false);
+                  navigate('/panel-estudiante#perfil');
+                }}
+              >
+                <span>👤 Perfil</span>
+              </button>
+              <button
+                type="button"
+                className="user-menu__item"
+                onClick={() => {
+                  setMenuUsuarioAbierto(false);
+                }}
+              >
+                <span>⚙️ Configuración</span>
+              </button>
+              <button
+                type="button"
+                className="user-menu__item user-menu__item--theme"
+                onClick={() => {
+                  setMenuUsuarioAbierto(false);
+                  toggleTheme();
+                }}
+              >
+                <span>{theme === 'dark' ? '☀️ Tema claro' : '🌙 Tema oscuro'}</span>
+              </button>
+              <button
+                type="button"
+                className="user-menu__item user-menu__item--danger"
+                onClick={() => {
+                  setMenuUsuarioAbierto(false);
+                  handleCerrarSesion();
+                }}
+              >
+                <span>🚪 Cerrar sesión</span>
+              </button>
+            </div>
+          )}
+          </>
         ) : (
           <div className="header-actions-guest">
             <Link to="/estudiante" className="btn-guest btn-guest-student">⚔️ Entrar al Gremio</Link>

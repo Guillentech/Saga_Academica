@@ -232,12 +232,14 @@ strong, b { font-weight: 400; }
   padding: 0.75rem 1.75rem;
   background: var(--panel-lo);
   box-shadow: 0 4px 0 0 var(--violet), 0 8px 0 0 var(--ink);
-  transition: transform 0.25s ease;
+  transition: transform 0.25s ease, opacity 0.25s ease;
 }
 
-/* Oculta el header al hacer scroll hacia abajo en móvil. */
+/* Oculta el header durante el scroll; solo se muestra con scrollTop === 0. */
 .header-pro--oculto {
   transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .header-left { display: flex; align-items: center; gap: 1rem; }
@@ -661,11 +663,28 @@ td {
 }
 
 @media (max-width: 640px) {
-  body { font-size: 20px; }
+  body { font-size: 16px; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 14px; }
+  h3 { font-size: 11px; }
+  h4 { font-size: 9px; }
   .header-pro { padding: 0.65rem 1rem; }
   .brand-title { font-size: 10px; }
+  .brand-subtitle { font-size: 15px; }
   .container { padding: 1rem 0.85rem; }
   .card-pro, .card { padding: 1.15rem; }
+  .section-title { font-size: 10px; }
+  .section-sub { font-size: 16px; }
+  .role-title { font-size: 17px; }
+  .role-copy { font-size: 17px; }
+  .quest-card__title { font-size: 17px; }
+  .quest-card__desc { font-size: 16px; }
+  .scroll-entry__title { font-size: 17px; }
+  .scroll-entry__desc { font-size: 16px; }
+  .rpg-window__body { font-size: 17px; }
+  .stat-bar__value { font-size: 16px; }
+  .hud-role { font-size: 16px; }
+  .hud-weather__state { font-size: 16px; }
   .rpg-hotbar { position: sticky; bottom: 8px; z-index: 60; padding: 0.4rem; }
 }
 
@@ -1001,6 +1020,7 @@ p, li, td, th, label { overflow-wrap: break-word; }
   gap: 0.75rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  position: relative;
 }
 
 .header-user { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
@@ -4212,9 +4232,89 @@ body.auth-teacher-active .header-pro {
 
 .perfil-preview .avatar-preset { box-shadow: none; }
 
-.entrega-modal__archivo {
+/* ---------------------------------------------------------------------
+   Modal de entrega de misiones (estudiante)
+   --------------------------------------------------------------------- */
+.entrega-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
   display: flex;
   align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(4, 3, 12, 0.78);
+}
+
+.entrega-modal {
+  position: relative;
+  inset: auto;
+  width: min(680px, 100%);
+  max-height: min(88vh, 780px);
+  margin: 0;
+  animation: entrega-modal-appear 160ms steps(2, end);
+}
+
+@keyframes entrega-modal-appear {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.entrega-modal__form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.entrega-modal__form .rpg-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.entrega-modal__meta {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.entrega-modal__estado {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.entrega-modal__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.85rem 0 0.4rem;
+  font-family: var(--font-px);
+  font-size: 9px;
+  line-height: 1.6;
+  color: var(--gold);
+}
+
+.entrega-modal__label span {
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.entrega-modal .input-pro {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+}
+
+.entrega-modal__archivo {
+  display: flex;
+  align-items: flex-start;
   gap: 0.45rem;
   margin: 0.6rem 0;
   padding: 0.55rem 0.7rem;
@@ -4225,12 +4325,208 @@ body.auth-teacher-active .header-pro {
   overflow-wrap: anywhere;
 }
 
+.entrega-modal__archivo-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.entrega-modal__archivo-texto span {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.entrega-modal__archivo-texto a {
+  color: var(--teacher);
+  overflow-wrap: anywhere;
+}
+
+.entrega-modal__archivo-texto a:hover { color: var(--gold); }
+
+.entrega-modal__feedback {
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  font-size: 17px;
+  color: var(--text-main);
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--teacher-lo);
+}
+
+.entrega-modal__feedback strong {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-family: var(--font-px);
+  font-size: 8px;
+  line-height: 1.6;
+  color: var(--teacher);
+}
+
+.entrega-modal__feedback p { margin: 0; }
+
+/* Zona de carga: clic o arrastre de PDF/DOC/DOCX */
+.entrega-drop {
+  position: relative;
+  margin-top: 0.7rem;
+  padding: 0.9rem;
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--panel-hi);
+}
+
+.entrega-drop.is-dragging {
+  background: var(--gold-bg);
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+
+.entrega-drop.has-file {
+  box-shadow: inset 0 0 0 2px var(--student-lo);
+}
+
+.entrega-drop__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.entrega-drop__label {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  cursor: pointer;
+}
+
+.entrega-drop__icon {
+  flex: 0 0 auto;
+  color: var(--gold);
+}
+
+.entrega-drop__texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 17px;
+  color: var(--text-muted);
+}
+
+.entrega-drop__texto strong {
+  font-size: 18px;
+  color: var(--text-main);
+}
+
+.entrega-drop__file {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+  padding: 0.45rem 0.55rem;
+  font-size: 17px;
+  color: var(--xp);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px var(--student-lo);
+  overflow-wrap: anywhere;
+}
+
+.entrega-drop__file span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.entrega-drop__quitar {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 0;
+  font-family: var(--font-px);
+  font-size: 9px;
+  color: var(--on-accent);
+  cursor: pointer;
+  background: var(--hp);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
+.entrega-drop__quitar:hover {
+  color: var(--ink);
+  background: var(--hp-hi);
+}
+
+.entrega-modal__nota {
+  margin: 0.55rem 0 0;
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
 .entrega-modal__acciones {
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
   flex-wrap: wrap;
-  margin-top: 0.8rem;
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: 0.75rem 1rem;
+  background: var(--panel-lo);
+  box-shadow: inset 0 2px 0 0 var(--panel-hi);
+}
+
+/* Resumen de la entrega actual dentro de la tarjeta de misión */
+.entrega-resumen {
+  margin-top: 0.7rem;
+  padding: 0.6rem 0.7rem;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px var(--panel-hi);
+}
+
+.entrega-resumen__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.entrega-resumen__titulo {
+  font-family: var(--font-px);
+  font-size: 8px;
+  line-height: 1.6;
+  color: var(--gold);
+}
+
+.entrega-resumen__texto {
+  display: -webkit-box;
+  margin: 0 0 0.35rem;
+  overflow: hidden;
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+.entrega-resumen .quest-file { margin: 0.35rem 0 0; }
+
+.entrega-feedback {
+  margin: 0.45rem 0 0;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.entrega-feedback strong { color: var(--teacher); }
+
+.quest-card__entrega { margin-top: 0.7rem; }
+
+@media (max-width: 640px) {
+  .entrega-overlay { align-items: flex-end; padding: 0.5rem; }
+  .entrega-modal { width: 100%; max-height: calc(100vh - 1rem); }
+  .entrega-modal__acciones { padding: 0.6rem 0.75rem; }
+  .entrega-modal__acciones .btn-pro { flex: 1 1 auto; }
+  .entrega-drop__label { align-items: flex-start; }
 }
 
 .perfil-mensaje {
@@ -4240,6 +4536,7 @@ body.auth-teacher-active .header-pro {
 }
 
 .perfil-mensaje.is-error { color: var(--red-hi); }
+.perfil-mensaje.is-success { color: var(--xp); }
 
 @media (max-width: 640px) {
   .header-pro--movil .brand-title { font-size: 9px; }
@@ -4513,7 +4810,6 @@ body.auth-teacher-active .header-pro {
 
 /* Contenedor de vista larga: scrolleo interno, HUD y hotbar fijos */
 .vista-scroll {
-  max-height: calc(100vh - 260px);
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--panel-hi) var(--panel-lo);
@@ -4635,7 +4931,716 @@ body.auth-teacher-active .header-pro {
 
 /* Responsive: menos altura máxima en móvil */
 @media (max-width: 640px) {
-  .vista-scroll { max-height: calc(100vh - 320px); }
   .btn-subir { bottom: 3.2rem; right: 0.5rem; }
   .vista-resumen__item { flex: 1 1 100%; }
+}
+
+/* =====================================================================
+   UX MÓVIL HORIZONTAL — respiro y prioridad al mapa 2D
+   ---------------------------------------------------------------------
+   · En pantallas anchas y bajas (celular horizontal), hay más aire
+     entre HUD, secciones y hotbar.
+   · Cuando se está en el mapa 2D, el HUD se comprime para que el mapa
+     continental sea el protagonista sin competir con datos del personaje.
+   ===================================================================== */
+
+/* Móvil horizontal: más aire entre bloques */
+@media (max-width: 800px) and (max-height: 460px) {
+  .panel-page { padding-bottom: 1.5rem; }
+  .page-shell { padding-top: 0.4rem; }
+  .vista-scroll { max-height: calc(100vh - 200px); }
+  .btn-subir { bottom: 2.6rem; right: 0.5rem; }
+
+  /* HUD más compacto: barras más finas, menos gap */
+  .hud-panel,
+  .rpg-hud-top {
+    gap: 0.5rem;
+    padding: 0.5rem 0.8rem;
+    margin: 4px 4px 0.5rem;
+  }
+  .rpg-stat-bar,
+  .stat-bar { height: 10px; }
+  .hud-avatar { width: 44px; height: 44px; flex: 0 0 44px; }
+  .hud-avatar--gold { width: 46px; height: 46px; flex-basis: 46px; }
+
+  /* Títulos de sección más compactos */
+  .section-title { font-size: 10px; margin-bottom: 0.75rem; padding-bottom: 0.35rem; }
+  .quest-card--compact { padding: 0.45rem 0.55rem; margin-bottom: 0.4rem; }
+  .scroll-entry { padding-bottom: 0.6rem; margin-bottom: 0.7rem; }
+
+  /* Hotbar más accesible en horizontal */
+  .rpg-hotbar { padding: 0.4rem 0.2rem; gap: 0.3rem; }
+  .rpg-hotbar-slot { padding: 6px 2px; gap: 4px; }
+}
+
+/* Prioridad al mapa 2D: HUD comprimido cuando se navega el mapa continental */
+.mapa-activo .hud-panel,
+.mapa-activo .rpg-hud-top {
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  margin: 4px 4px 0.4rem;
+}
+.mapa-activo .rpg-stat-bar,
+.mapa-activo .stat-bar { height: 9px; }
+.mapa-activo .hud-avatar { width: 40px; height: 40px; flex: 0 0 40px; }
+.mapa-activo .hud-avatar--gold { width: 42px; height: 42px; flex-basis: 42px; }
+.mapa-activo .hud-stats { padding: 0.05rem 0.6rem; gap: 0.3rem; }
+.mapa-activo .hud-weather { gap: 0.4rem; }
+.mapa-activo .hud-weather__icon { width: 38px; height: 38px; flex: 0 0 38px; }
+
+/* Cuando no hay mapa activo, asegurar que no quede residuo de .mapa-activo */
+.panel-page:not(.mapa-activo) .hud-panel,
+.panel-page:not(.mapa-activo) .rpg-hud-top {
+  /* valores por defecto ya definidos en auditoría; esta regla solo anula si se aplicó antes */
+}
+
+/* =====================================================================
+   MENÚ DE USUARIO EN HEADER (Opción A)
+   ---------------------------------------------------------------------
+   · Desplegable activado al hacer clic en el avatar/nombre del header.
+   · Estilo pixel-art: bordes box-shadow 0 blur, sin radius, sin transiciones.
+   ===================================================================== */
+
+.user-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  min-width: 180px;
+  background: var(--panel);
+  box-shadow:
+    0 -4px 0 0 var(--violet), 0 4px 0 0 var(--violet),
+    -4px 0 0 0 var(--violet), 4px 0 0 0 var(--violet),
+    inset 4px 4px 0 0 var(--panel-hi), inset -4px -4px 0 0 var(--panel-lo);
+}
+.user-menu__item {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  font-family: var(--font-body);
+  font-size: 17px;
+  color: var(--text-main);
+  background: var(--panel-lo);
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: inset 0 -1px 0 0 var(--panel-hi);
+}
+.user-menu__item:last-child { box-shadow: none; }
+.user-menu__item:hover { background: var(--panel-hi); color: var(--gold); }
+.user-menu__item--danger:hover { background: var(--red-lo); color: var(--red-hi); }
+
+/* Cursor de puntero sobre el badge de perfil cuando hay menú disponible */
+.user-profile-badge[ref] { cursor: pointer; }
+.user-profile-badge:hover { box-shadow: 0 0 0 2px var(--gold); }
+
+/* =====================================================================
+   HEADER COMPACTO — pantallas pequeñas / móvil horizontal
+   ---------------------------------------------------------------------
+   · Menos padding y botones con solo ícono para reducir la altura
+     del header en pantallas ~800×360.
+   · Se aplica mediante la clase .header-pro--compacto desde App.jsx.
+   ===================================================================== */
+.header-pro--compacto {
+  padding: 0.5rem 1rem !important;
+}
+.header-pro--compacto .brand-title { font-size: 10px; }
+.header-pro--compacto .brand-subtitle { font-size: 15px; }
+.header-pro--compacto .btn-theme-toggle { width: 32px; height: 32px; }
+.header-pro--compacto .user-profile-badge { padding: 0.25rem 0.5rem; }
+.header-pro--compacto .avatar-circle { width: 28px; height: 28px; }
+.header-pro--compacto .user-name,
+.header-pro--compacto .user-role { display: none; }
+
+/* =====================================================================
+   COMBATE ARCANO v1 — feedback inmediato, HP, combo y crónica
+   ---------------------------------------------------------------------
+   · HUD superior con fase, tiempo y toggle de SFX.
+   · Placas de HP con números y barras segmentadas.
+   · Daño flotante, combo, feedback por conjuro y overlays de intro,
+     confirmación y ataque final.
+   ===================================================================== */
+
+.combat-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.rpg-combat-turn--gold { color: var(--gold); }
+
+.rpg-combat-timer.is-urgent {
+  color: var(--on-accent);
+  background: var(--hp);
+  box-shadow: inset 0 0 0 2px var(--hp-hi);
+  animation: combat-pulse 0.8s steps(2) infinite;
+}
+
+@keyframes combat-pulse {
+  50% { opacity: 0.55; }
+}
+
+.combat-sfx-toggle {
+  width: 34px;
+  height: 34px;
+}
+
+/* --- Placas de combatiente --- */
+.combat-plate {
+  min-width: 156px;
+  padding: 5px 9px;
+}
+
+.combat-plate strong {
+  display: block;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.combat-plate--boss strong { color: var(--hp-hi); }
+
+.combat-plate__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 3px;
+  font-family: var(--font-px);
+  font-size: 8px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.combat-plate__meta span:last-child { color: var(--gold); }
+
+.combat-hpbar {
+  width: 100% !important;
+  height: 10px;
+  margin: 4px 0 0;
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--edge-soft);
+}
+
+.combat-hpbar__fill {
+  height: 100%;
+  background: repeating-linear-gradient(90deg, var(--xp) 0 6px, var(--xp-lo) 6px 8px);
+  transition: width 0.16s steps(2);
+}
+
+.combat-hpbar__fill--boss {
+  background: repeating-linear-gradient(90deg, var(--hp) 0 6px, var(--hp-lo) 6px 8px);
+}
+
+.combat-avatar {
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--teacher), 3px 3px 0 0 var(--edge);
+}
+
+.rpg-fighter--hero.is-hit {
+  animation: combat-hero-hit 0.32s steps(2) 1;
+}
+
+@keyframes combat-hero-hit {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-8px); }
+}
+
+/* --- Combo y daño flotante --- */
+.combat-combo {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  transform: translateX(-50%);
+  font-family: var(--font-px);
+  font-size: 8px;
+  line-height: 1.5;
+  color: var(--gold-ink);
+  background: var(--gold);
+  box-shadow: inset 0 0 0 2px var(--gold-hi), 3px 3px 0 0 var(--edge);
+  animation: combat-combo-pop 0.25s steps(2) 1;
+}
+
+.combat-combo span {
+  color: var(--gold-ink);
+  opacity: 0.8;
+}
+
+@keyframes combat-combo-pop {
+  0% { transform: translateX(-50%) scale(0.7); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+
+.combat-float {
+  position: absolute;
+  z-index: 8;
+  pointer-events: none;
+  font-family: var(--font-px);
+  font-size: 14px;
+  line-height: 1.4;
+  text-shadow: 2px 2px 0 var(--edge);
+  animation: combat-float-up 0.95s steps(6) forwards;
+}
+
+.combat-float--boss {
+  right: 16%;
+  top: 38%;
+  color: var(--gold-hi);
+}
+
+.combat-float--hero {
+  left: 14%;
+  top: 38%;
+  color: var(--hp-hi);
+}
+
+.combat-float.is-crit { font-size: 18px; color: var(--xp-hi); }
+.combat-float--hero.is-crit { color: var(--hp-hi); }
+
+@keyframes combat-float-up {
+  0% { opacity: 1; transform: translateY(0) scale(0.8); }
+  25% { transform: translateY(-10px) scale(1.15); }
+  100% { opacity: 0; transform: translateY(-42px) scale(1); }
+}
+
+/* --- Opciones bloqueadas y feedback --- */
+.rpg-option { position: relative; }
+.rpg-option:disabled { cursor: default; transform: none; }
+.rpg-option.is-locked { opacity: 0.78; }
+
+.rpg-option.is-correct,
+.rpg-option.is-wrong {
+  color: var(--text-main);
+  opacity: 1;
+  transform: none;
+}
+
+.rpg-option.is-correct {
+  background: var(--xp-lo);
+  box-shadow: inset 0 0 0 2px var(--xp), 3px 3px 0 0 var(--edge);
+}
+
+.rpg-option.is-wrong {
+  background: var(--hp-lo);
+  box-shadow: inset 0 0 0 2px var(--hp), 3px 3px 0 0 var(--edge);
+}
+
+.rpg-option.is-correct .rpg-option__key { color: var(--xp); }
+.rpg-option.is-wrong .rpg-option__key { color: var(--hp); }
+
+.rpg-option__mark {
+  margin-left: auto;
+  font-family: var(--font-px);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.rpg-option.is-correct .rpg-option__mark { color: var(--xp); }
+.rpg-option.is-wrong .rpg-option__mark { color: var(--hp); }
+
+.rpg-turn-btn.is-correct {
+  color: var(--text-main);
+  background: var(--xp-lo);
+  box-shadow: inset 0 0 0 2px var(--xp);
+}
+
+.rpg-turn-btn.is-wrong {
+  color: var(--text-main);
+  background: var(--hp-lo);
+  box-shadow: inset 0 0 0 2px var(--hp);
+}
+
+.rpg-turn-btn:disabled { cursor: default; }
+
+.rpg-turn-btn.is-active.is-correct,
+.rpg-turn-btn.is-active.is-wrong {
+  box-shadow: inset 0 0 0 2px var(--gold), 2px 2px 0 0 var(--edge);
+}
+
+.combat-feedback {
+  margin-top: 1rem;
+  padding: 0.8rem 0.9rem;
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--feedback, var(--panel-hi));
+  animation: combat-feedback-in 0.2s steps(2) 1;
+}
+
+.combat-feedback.is-correct { --feedback: var(--xp); }
+.combat-feedback.is-wrong { --feedback: var(--hp); }
+
+.combat-feedback__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0.45rem;
+  font-family: var(--font-px);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--feedback, var(--gold));
+}
+
+.combat-feedback__answer {
+  font-size: 20px;
+  line-height: 1.3;
+  color: var(--text-main);
+}
+
+.combat-feedback__explain {
+  margin-top: 0.35rem;
+  font-size: 19px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.combat-feedback__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.7rem;
+}
+
+.combat-casting {
+  font-size: 18px;
+  color: var(--gold);
+  animation: combat-pulse 0.8s steps(2) infinite;
+}
+
+@keyframes combat-feedback-in {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Overlays de intro, confirmación y ataque final --- */
+.combat-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  overflow-y: auto;
+  background: var(--overlay);
+}
+
+body:has(.combat-overlay) { overflow: hidden; }
+
+.combat-overlay--final {
+  z-index: 210;
+  background: var(--overlay);
+}
+
+.combat-intro,
+.combat-modal {
+  width: min(620px, 100%);
+  padding: 1.35rem 1.4rem;
+  text-align: center;
+  background: var(--panel);
+  box-shadow:
+    0 -4px 0 0 var(--hp), 0 4px 0 0 var(--hp),
+    -4px 0 0 0 var(--hp), 4px 0 0 0 var(--hp),
+    inset 4px 4px 0 0 var(--panel-hi), inset -4px -4px 0 0 var(--panel-lo);
+  animation: combat-overlay-in 0.22s steps(3) 1;
+}
+
+@keyframes combat-overlay-in {
+  0% { opacity: 0; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.combat-intro__kicker {
+  display: block;
+  font-family: var(--font-px);
+  font-size: 9px;
+  line-height: 1.6;
+  color: var(--gold);
+}
+
+.combat-intro__sprite {
+  margin: 0.8rem auto 0.2rem;
+  line-height: 0;
+  animation: combat-boss-breathe 1.4s steps(2) infinite;
+}
+
+@keyframes combat-boss-breathe {
+  50% { transform: translateY(-4px); }
+}
+
+.combat-intro__boss {
+  margin: 0.35rem 0;
+  font-family: var(--font-px);
+  font-size: clamp(14px, 3.6vw, 22px);
+  line-height: 1.5;
+  color: var(--hp-hi);
+  text-shadow: 3px 3px 0 var(--edge);
+}
+
+.combat-intro__theme {
+  font-size: 22px;
+  line-height: 1.3;
+  color: var(--gold);
+}
+
+.combat-intro__lore {
+  max-width: 46ch;
+  margin: 0.6rem auto 0.9rem;
+  font-size: 19px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.combat-intro__rules {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.combat-intro__rules span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  font-size: 17px;
+  color: var(--text-main);
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--panel-hi);
+}
+
+.combat-modal {
+  text-align: left;
+  box-shadow:
+    0 -4px 0 0 var(--gold), 0 4px 0 0 var(--gold),
+    -4px 0 0 0 var(--gold), 4px 0 0 0 var(--gold),
+    inset 4px 4px 0 0 var(--panel-hi), inset -4px -4px 0 0 var(--panel-lo);
+}
+
+.combat-modal__title {
+  margin-bottom: 0.6rem;
+  font-family: var(--font-px);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--gold);
+}
+
+.combat-modal__copy {
+  font-size: 20px;
+  color: var(--text-main);
+}
+
+.combat-modal__warning {
+  margin-top: 0.45rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 19px;
+  line-height: 1.3;
+  color: var(--danger-ink);
+  background: var(--danger-bg);
+  box-shadow: inset 0 0 0 2px var(--hp);
+}
+
+.combat-modal__stats {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin: 0.8rem 0;
+}
+
+.combat-modal__stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  font-size: 17px;
+  color: var(--text-main);
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--panel-hi);
+}
+
+.combat-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+}
+
+.combat-final-fx {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(680px, 100%);
+  text-align: center;
+}
+
+.combat-final-fx__fighters {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.combat-final-fx__fighter { line-height: 0; }
+.combat-final-fx__fighter--hero { animation: combat-final-hero 0.6s steps(3) 1; }
+.combat-final-fx__fighter--boss { animation: combat-final-boss 0.6s steps(3) 1; }
+
+.combat-final-fx__bolt {
+  display: inline-block;
+  font-size: 3rem;
+  line-height: 1;
+  animation: combat-bolt 0.35s steps(2) infinite;
+}
+
+.combat-final-fx__title {
+  margin-top: 1rem;
+  font-family: var(--font-px);
+  font-size: clamp(18px, 5vw, 30px);
+  line-height: 1.5;
+  color: var(--gold-hi);
+  text-shadow: 4px 4px 0 var(--edge);
+  animation: combat-title-flash 0.3s steps(2) infinite;
+}
+
+.combat-final-fx__copy {
+  margin-top: 0.6rem;
+  font-size: 22px;
+  color: var(--text-main);
+}
+
+@keyframes combat-final-hero {
+  0% { opacity: 0; transform: translateX(-30px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes combat-final-boss {
+  0% { opacity: 0; transform: translateX(30px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes combat-bolt {
+  50% { transform: scale(1.25) rotate(6deg); }
+}
+
+@keyframes combat-title-flash {
+  50% { color: var(--hp-hi); }
+}
+
+/* --- Crónica del resultado --- */
+.combat-chronicle {
+  margin: 1rem 0 1.1rem;
+  padding: 0.9rem;
+  text-align: left;
+  background: var(--panel-lo);
+  box-shadow: inset 0 0 0 2px var(--gold);
+}
+
+.combat-chronicle__title {
+  margin-bottom: 0.65rem;
+  font-family: var(--font-px);
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--gold);
+}
+
+.combat-chronicle__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.combat-chronicle__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0.5rem 0.35rem;
+  text-align: center;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px var(--panel-hi);
+}
+
+.combat-chronicle__stat svg { color: var(--gold); }
+
+.combat-chronicle__stat span {
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.combat-chronicle__stat strong {
+  font-family: var(--font-px);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-main);
+}
+
+.result-detail__explain {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 18px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .combat-plate {
+    min-width: 0;
+    width: 118px;
+    padding: 4px 6px;
+  }
+
+  .combat-plate strong {
+    max-width: 100%;
+    font-size: 13px;
+  }
+
+  .combat-plate__meta { font-size: 7px; }
+  .combat-hpbar { height: 8px; }
+
+  .combat-combo {
+    bottom: 6px;
+    padding: 3px 6px;
+    font-size: 7px;
+  }
+
+  .combat-float { font-size: 11px; }
+  .combat-float--boss { right: 10%; top: 34%; }
+  .combat-float--hero { left: 8%; top: 34%; }
+
+  .combat-overlay { padding: 0.5rem; }
+  .combat-intro,
+  .combat-modal { padding: 1rem; }
+
+  .combat-intro__lore { font-size: 18px; }
+
+  .combat-intro__rules span,
+  .combat-modal__stats span { font-size: 16px; }
+
+  .combat-final-fx__fighters { gap: 0.4rem; }
+  .combat-final-fx__bolt { margin: 0; font-size: 2rem; }
+
+  .combat-chronicle__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combat-intro__sprite,
+  .combat-combo,
+  .combat-float,
+  .combat-final-fx__fighter,
+  .combat-final-fx__bolt,
+  .combat-final-fx__title,
+  .rpg-fighter.is-hit,
+  .rpg-attack-fx,
+  .combat-feedback,
+  .rpg-combat-timer.is-urgent,
+  .combat-casting {
+    animation: none !important;
+  }
+
+  .entrega-modal { animation: none; }
 }
